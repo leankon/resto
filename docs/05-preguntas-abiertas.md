@@ -3,31 +3,25 @@
 Lo que falta definir para arrancar la Fase 1. Las **bloqueantes** cambian el modelo de
 datos; las demás se pueden decidir sobre la marcha con un default razonable.
 
+> Las preguntas 1, 2, 3 y 6 ya están resueltas — ver [doc 00](00-decisiones.md).
+
 ## Bloqueantes para Fase 1
 
-**1. Duración del turno.**
-¿Fija por local (ej. 90 min para todos), variable por tamaño de grupo (la tabla propuesta
-en el doc 03), o variable también por franja horaria?
-Default si no decidís: variable por tamaño de grupo, con override por franja y por reserva.
-Es lo más flexible y el costo extra de implementarlo ahora es bajo; migrar después implica
-recalcular periodos de reservas existentes.
+**~~1. Duración del turno.~~** Resuelta → **D1**: variable por grupo y por franja.
 
-**2. ¿Cuántas mesas y cuántos locales esperás?**
-Cambia el algoritmo. Hasta ~80 mesas por salón, la búsqueda exhaustiva de combos corre en
-milisegundos y no hay nada que optimizar. Arriba de eso (salones de eventos, patios de
-comidas) hay que podar. Y en cantidad de tenants: 10 vs. 1.000 no cambia la estrategia de
-multi-tenancy recomendada, pero sí cuánto invertir ahora en onboarding automatizado.
+**~~2. ¿Cuántas mesas y cuántos locales esperás?~~** Resuelta → **D3**: 5–20 locales,
+hasta ~50 mesas. Sin podar el algoritmo, onboarding manual por ahora.
 
-**3. ¿Reserva pinea la mesa, o la mesa puede moverse sola hasta el servicio?**
-Es el híbrido del doc 01 punto 5. Si aceptás el re-optimizador, el modelo necesita
-`fijada_manualmente` y una política de "hasta cuándo se puede mover" desde el día uno.
-Recomiendo aceptarlo: recupera capacidad real sin perder la vista del panel.
+**~~3. ¿Reserva pinea la mesa?~~** Resuelta → **D2**: re-optimizable hasta 4hs antes,
+salvo que el staff la haya fijado a mano.
 
 **4. ¿El cliente elige mesa o zona?**
 ¿Puede pedir "terraza" o "adentro"? ¿Ve el número de mesa en la confirmación?
-Mostrar el número de mesa al cliente es lo que impide re-optimizar después de enviar el
-aviso. Recomiendo: **no** mostrar número de mesa en la confirmación, sí permitir preferencia
-de zona/nivel. El número se muestra recién en el recordatorio de T-3h, cuando ya está firme.
+Parcialmente resuelta por **D2**: como la asignación es re-optimizable, la confirmación
+**no** lleva número de mesa; se comunica recién en el recordatorio de T-3h, ya congelada.
+**Lo que queda por definir:** ¿el cliente puede pedir zona o nivel ("terraza", "adentro",
+"planta baja")? Recomiendo que sí, como preferencia blanda que el motor puntúa pero no
+garantiza — si es garantía dura, un salón se fragmenta rápido.
 
 **5. Estados de reserva.**
 Propongo: `pendiente → confirmada → sentada → finalizada`, más `cancelada`, `no_show`,
@@ -39,9 +33,9 @@ y el brief no lo menciona.
 
 ## Importantes, no bloqueantes
 
-**6. WhatsApp: ¿número compartido de la plataforma o uno por local?**
-Ver el cuadro del doc 01. Afecta Fase 3, pero conviene decidirlo antes para modelar
-`tenant_canales_whatsapp` con la cardinalidad correcta.
+**~~6. WhatsApp: ¿número compartido o uno por local?~~** Resuelta → **D4**: número por
+local como destino, compartido con deep link para probar. `tenant_canales_whatsapp` se
+modela 1:N desde la primera migración.
 
 **7. Dominio propio por local.**
 ¿Es requisito de lanzamiento o alcanza con `fulano.reservas.app` + widget embebible?

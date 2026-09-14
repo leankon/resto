@@ -47,15 +47,26 @@ Esta es la decisión más cara del proyecto y hay que tomarla antes de la Fase 3
 El riesgo de calidad compartida es el que mata la opción 1 a mediano plazo: Meta baja el
 límite de mensajería del número entero si acumula bloqueos/reportes.
 
-**Recomendación:** empezar Fase 3 con el número que ya tenés (compartido, para validar el
-flujo conversacional) pero modelar `tenant_canales_whatsapp` desde el principio como
-relación 1:N, de forma que migrar a número por local sea configuración y no reescritura.
+**Decidido (ver doc 00): número propio por local como destino; número compartido con
+identificador de tenant solo para probar el flujo.**
 
-Problema adicional del número compartido: si el cliente escribe "quiero reservar para 4",
-**no sabemos a qué local le está escribiendo**. Se resuelve con deep links
-(`wa.me/<numero>?text=RESERVA-<slug>`) que prefijan el mensaje con el identificador del
-local, y persistiendo el último tenant de la conversación. Funciona, pero es frágil si el
-cliente escribe en frío. Con número por local esto desaparece.
+Durante las pruebas de Fase 3 se usa el número que ya tenés, y el local se identifica con
+deep links: `wa.me/<numero>?text=RESERVA-<slug>` prefija el mensaje con el identificador,
+y la conversación recuerda el último tenant. Funciona para validar, pero es frágil si el
+cliente escribe en frío sin pasar por el link — en ese caso el bot tiene que preguntar a
+qué local le está escribiendo, que es exactamente la fricción que justifica migrar.
+
+Consecuencia de diseño, y es la razón por la que esto se decide ahora y no en Fase 3:
+`tenant_canales_whatsapp` se modela **1:N desde el día uno**, el número compartido es una
+fila más (marcada `es_compartido = true`), y todo el ruteo entrante resuelve el tenant por
+`(numero_destino, conversación, deep link)` en ese orden. Cuando un local trae su propio
+número, se carga una fila y el prefijo deja de usarse para él: cero migración.
+
+Lo que sí hay que presupuestar para llegar al destino: ser **Tech Provider** de Meta e
+implementar **Embedded Signup**, o apoyarse en un BSP como 360dialog que ya lo tiene
+resuelto. Es un bloque de trabajo propio, no un ajuste de config — conviene planificarlo
+como el cierre de la Fase 3 o el comienzo de la Fase 4, no como parte del MVP
+conversacional.
 
 ### 3. Reserva confirmada sin seña
 

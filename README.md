@@ -13,6 +13,7 @@ Leer en orden:
 
 | Doc | Contenido |
 |---|---|
+| [00 — Decisiones tomadas](docs/00-decisiones.md) | lo que ya está definido y por qué |
 | [01 — Viabilidad y riesgos](docs/01-viabilidad-y-riesgos.md) | qué es viable, los cinco puntos caros del brief |
 | [02 — Stack y arquitectura](docs/02-stack-y-arquitectura.md) | stack recomendado con alternativas, multi-tenancy, hosting, proveedores y costos |
 | [03 — Modelo de datos y asignación](docs/03-modelo-de-datos-y-asignacion.md) | tablas, el motor de mesas, concurrencia, auditoría |
@@ -25,11 +26,13 @@ Leer en orden:
 - **Multi-tenancy:** tabla compartida con `tenant_id` + Row Level Security de Postgres.
 - **Doble booking:** imposible por constraint `EXCLUDE USING gist` sobre `(mesa, periodo)`.
 - **Concurrencia:** advisory lock por (tenant, fecha) + la constraint como red de seguridad.
-- **Asignación:** mesa concreta al reservar, pero re-optimizable mientras no esté fijada a
-  mano por el staff.
+- **Asignación:** mesa concreta al reservar, pero re-optimizable hasta 4hs antes mientras
+  no esté fijada a mano por el staff. La confirmación al cliente no lleva número de mesa.
+- **Turnos:** duración variable por tamaño de grupo y por franja horaria.
 - **Notificaciones:** módulo agnóstico de canal, patrón outbox, un único resolutor de canal.
-- **WhatsApp:** Cloud API directo detrás de una interfaz de proveedor, para poder migrar a
-  un BSP sin reescribir.
+- **WhatsApp:** Cloud API directo detrás de una interfaz de proveedor. Número propio por
+  local como destino; compartido con deep link para las pruebas de Fase 3.
+- **Escala objetivo del primer año:** 5–20 locales, hasta ~50 mesas cada uno.
 
 ## Fases
 

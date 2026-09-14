@@ -88,18 +88,41 @@ decisión. No toca la base. Eso la hace testeable con fixtures y determinista.
 
 ### Duración del turno
 
-Configurable por tenant, con esta forma por defecto (a confirmar con vos):
+**Decidido: variable por tamaño de grupo Y por franja horaria** (ver doc 00).
 
-| Personas | Duración | + buffer |
-|---|---|---|
-| 1–2 | 90 min | 15 min |
-| 3–4 | 105 min | 15 min |
-| 5–8 | 120 min | 20 min |
-| 9+ | 150 min | 20 min |
+La duración no es un número en la config del tenant: es una tabla de reglas.
 
-Con override por franja horaria (un almuerzo de oficina rota más rápido que una cena de
-sábado) y override manual por reserva desde el panel. El buffer se suma al `periodo` de
-`reservas_mesas` pero no se le muestra al cliente.
+```
+duraciones_turno
+  tenant_id, franja_id, personas_min, personas_max, duracion_min, buffer_min
+```
+
+`franjas_servicio` define los tramos con nombre por día de semana — típicamente
+`almuerzo` y `cena`, pero un local puede tener `after office` o `brunch`.
+
+Valores sembrados al dar de alta un local (editables desde el panel):
+
+| Personas | Almuerzo | Cena | + buffer |
+|---|---|---|---|
+| 1–2 | 75 min | 90 min | 15 min |
+| 3–4 | 90 min | 105 min | 15 min |
+| 5–8 | 105 min | 120 min | 20 min |
+| 9+ | 120 min | 150 min | 20 min |
+
+El almuerzo rota más rápido que la cena: eso es lo que captura la dimensión de franja, y
+es la diferencia entre vender dos turnos de mediodía o uno solo.
+
+Resolución, en orden: override manual de la reserva → regla `(franja, rango de personas)`
+→ regla `(cualquier franja, rango de personas)` → default de la plataforma. Que siempre
+haya un fallback evita que un local mal configurado rompa el motor.
+
+El buffer se suma al `periodo` de `reservas_mesas` pero **no** se le muestra al cliente:
+una reserva de 21:00 a 23:00 con buffer 20 ocupa la mesa hasta las 23:20 en el inventario,
+y el comensal solo ve "21:00".
+
+Borde a tener en cuenta: una reserva que arranca cerca del cierre de una franja y se pasa
+a la siguiente (21:45 en un local donde la cena empieza 20:00). La franja se resuelve por
+la hora de **inicio**, no por la de fin. Simple y predecible.
 
 ### Algoritmo
 
