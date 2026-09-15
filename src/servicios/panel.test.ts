@@ -48,8 +48,11 @@ describe('reservasDelDia', () => {
     expect(dia[0]!.salon).toBe('Planta baja');
   });
 
-  it('la reserva de la 01:00 pertenece al servicio de la noche anterior', async () => {
-    // Un bar que cierra a las 02:00 no arma una planilla nueva a la medianoche.
+  it('la planilla se arma por día de almanaque en hora local', async () => {
+    // La de las 00:30 del 11 sale en la planilla del 11. Para el bar es la noche del
+    // 10, así que el criterio está para revisar; lo que este test fija es que el corte
+    // sea en hora local del local y no en UTC, donde una reserva de las 22:00 del 10
+    // ya contaría como del 11.
     await crearReserva(app, {
       tenantId: local.tenantId,
       inicio: new Date('2026-10-11T00:30:00-03:00'),

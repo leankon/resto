@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
-import { horariosDelDia } from './agenda';
+import { horariosDelDia, horasDeApertura } from './agenda';
 import { ALMUERZO, CENA, TZ, local } from './fixtures';
+import type { DiaSemana } from './tipos';
 import { reglasSembradas, type ConfigTurnos } from './turnos';
 
 const config: ConfigTurnos = {
@@ -87,5 +88,65 @@ describe('horariosDelDia', () => {
     };
     const instantes = horariosDelDia('2026-09-15', 2, solapadas).map((h) => h.inicio.getTime());
     expect(new Set(instantes).size).toBe(instantes.length);
+  });
+});
+
+describe('horasDeApertura', () => {
+  it('cubre lo que abre ese día más la cola de la noche anterior', () => {
+    const horas = horasDeApertura('2026-09-15', config);
+
+    expect(horas).toContain('12:00');   // abre el almuerzo
+    expect(horas).toContain('16:00');   // cierra el almuerzo
+    expect(horas).toContain('20:00');   // abre la cena
+    expect(horas).toContain('23:00');
+    // La madrugada de este día es la cola de la cena de ayer, y aparece igual: a la
+    // 01:00 todavía hay mesas ocupadas y el encargado tiene que poder verlas.
+    expect(horas).toContain('01:00');
+    expect(horas).toContain('02:00');
+  });
+
+  it('son horas de reloj de ese día, nunca pasadas las 24', () => {
+    // La planilla del día es por día de almanaque: si acá apareciera "25:00" o una
+    // hora del día siguiente, el plano mostraría otro momento que la planilla.
+    for (const hora of horasDeApertura('2026-09-15', config)) {
+      expect(hora).toMatch(/^([01]\d|2[0-3]):[0-5]\d$/);
+    }
+  });
+
+  it('un lunes no arrastra la madrugada si el domingo el local no abre de noche', () => {
+    const sinDomingo = {
+      ...config,
+      // 2026-09-14 es lunes; el domingo (0) queda afuera de la cena.
+      franjas: [{ ...CENA, dias: [1, 2, 3, 4, 5, 6] as DiaSemana[] }],
+    };
+    const horas = horasDeApertura('2026-09-14', sinDomingo);
+
+    expect(horas).toContain('20:00');
+    expect(horas).not.toContain('01:00');
+  });
+
+  it('la apertura entra aunque no caiga en la hora redonda', () => {
+    const abreQuebrado = {
+      ...config,
+      franjas: [{ ...CENA, desde: '19:30', dias: [2] as DiaSemana[] }],
+    };
+    const horas = horasDeApertura('2026-09-15', abreQuebrado);
+
+    expect(horas[0]).toBe('19:30');
+    expect(horas[1]).toBe('20:00');
+  });
+
+  it('un día sin servicio no tiene horas que mirar', () => {
+    const soloSabados = { ...config, franjas: [{ ...CENA, dias: [6 as const] }] };
+    expect(horasDeApertura('2026-09-15', soloSabados)).toEqual([]);
+  });
+
+  it('no repite horas cuando dos franjas se tocan', () => {
+    const pegadas = {
+      ...config,
+      franjas: [ALMUERZO, { ...ALMUERZO, id: 'merienda', desde: '16:00', hasta: '20:00' }],
+    };
+    const horas = horasDeApertura('2026-09-15', pegadas);
+    expect(new Set(horas).size).toBe(horas.length);
   });
 });

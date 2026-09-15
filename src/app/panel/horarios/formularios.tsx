@@ -5,8 +5,15 @@ import type {
   DuracionConfigurada, ExcepcionConfigurada, FranjaConfigurada,
 } from '../../../servicios/configuracion';
 import {
-  alternarFranja, duracion, eliminarDuracion, eliminarExcepcion, eliminarFranja,
-  excepcion, franja, guardarNombre,
+  alternarFranja,
+  duracion,
+  duracionPareja,
+  eliminarDuracion,
+  eliminarExcepcion,
+  eliminarFranja,
+  excepcion,
+  franja,
+  guardarNombre,
 } from './acciones';
 
 const DIAS: [number, string][] = [
@@ -182,6 +189,7 @@ export function Duraciones({
   return (
     <>
       {error && <p className="aviso">{error}</p>}
+      <TodasIguales />
       {duraciones.length > 0 && (
         <table className="editor-mesas">
           <thead>
@@ -335,5 +343,36 @@ export function Excepciones({ excepciones }: { excepciones: ExcepcionConfigurada
         también queda cerrada.
       </p>
     </>
+  );
+}
+
+/**
+ * El atajo para el local que trabaja con turnos parejos.
+ *
+ * Las reglas por tamaño de grupo siguen estando y se pueden afinar después; esto fija
+ * el punto de partida sin tener que editar doce filas de a una, que es donde se cuela
+ * el error que deja un solo tamaño de grupo rotando distinto.
+ */
+function TodasIguales() {
+  const [error, enviar, enviando] = useActionState(duracionPareja, null);
+
+  return (
+    <form action={enviar} className="fila" style={{ marginBottom: 16, alignItems: 'flex-end' }}>
+      {error && <p className="aviso" style={{ flexBasis: '100%' }}>{error}</p>}
+      <label style={{ flex: '0 0 auto' }}>
+        Poner todos los turnos en
+        <input className="angosto" type="number" name="duracionMin" min={15} max={600}
+               step={15} defaultValue={120} />
+      </label>
+      <label style={{ flex: '0 0 auto' }}>
+        minutos, con limpieza de
+        <input className="angosto" type="number" name="bufferMin" min={0} max={120}
+               step={5} defaultValue={15} />
+      </label>
+      <button type="submit" className="secundario chico" disabled={enviando}
+              style={{ flex: '0 0 auto' }}>
+        {enviando ? 'Aplicando…' : 'Aplicar a todos'}
+      </button>
+    </form>
   );
 }

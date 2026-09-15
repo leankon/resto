@@ -4,8 +4,15 @@ import { revalidatePath } from 'next/cache';
 import { poolApp, requerirEncargado } from '../../../web/contexto';
 import type { DiaSemana } from '../../../dominio/tipos';
 import {
-  borrarDuracion, borrarExcepcion, borrarFranja, cambiarActivaFranja, guardarDuracion,
-  guardarExcepcion, guardarFranja, renombrarLocal,
+  borrarDuracion,
+  borrarExcepcion,
+  borrarFranja,
+  cambiarActivaFranja,
+  guardarDuracion,
+  guardarExcepcion,
+  guardarFranja,
+  ponerDuracionPareja,
+  renombrarLocal,
 } from '../../../servicios/configuracion';
 
 const RUTA = '/panel/horarios';
@@ -103,4 +110,17 @@ export async function eliminarExcepcion(datos: FormData) {
   await borrarExcepcion(poolApp(), ctx.tenantId, String(datos.get('excepcionId')));
   revalidatePath(RUTA);
   revalidatePath('/panel');
+}
+
+/** Poner la misma duración en todas las reglas, en vez de editar doce filas de a una. */
+export async function duracionPareja(_previo: string | null, datos: FormData) {
+  const ctx = await requerirEncargado();
+  const r = await ponerDuracionPareja(
+    poolApp(),
+    ctx.tenantId,
+    Number(datos.get('duracionMin') ?? 120),
+    Number(datos.get('bufferMin') ?? 15),
+  );
+  revalidatePath(RUTA);
+  return r.tipo === 'invalido' ? r.motivo : null;
 }

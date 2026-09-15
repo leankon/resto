@@ -77,3 +77,47 @@ export function horariosDelDia(
 
   return [...porInstante.values()].sort((a, b) => a.inicio.getTime() - b.inicio.getTime());
 }
+
+/**
+ * Las horas a las que tiene sentido mirar el salón en una fecha del almanaque.
+ *
+ * No es lo mismo que `horariosDelDia`. Ahí importa hasta cuándo se acepta que entre
+ * gente; acá importa hasta cuándo hay gente sentada. Un local que toma el último
+ * ingreso a las 01:00 y cierra a las 02:00 igual tiene mesas ocupadas a las 02:00, y el
+ * encargado necesita poder mirarlas.
+ *
+ * Devuelve horas de reloj de ESA fecha, entre 00:00 y 23:59, porque es lo que hace la
+ * planilla del día: la madrugada del domingo aparece en la planilla del domingo. Por eso
+ * se juntan dos cosas —lo que abre ese día, y la cola de la noche anterior que termina
+ * después de las doce—, y la cena que cruza medianoche se corta a la medianoche.
+ */
+export function horasDeApertura(
+  fecha: string,
+  config: ConfigTurnos,
+  paso: Minutos = 60,
+): string[] {
+  const dia = diaSemanaDe(fecha);
+  const ayer = ((dia + 6) % 7) as ReturnType<typeof diaSemanaDe>;
+  const minutos = new Set<number>();
+
+  const agregar = (desde: number, hasta: number) => {
+    for (let m = Math.ceil(desde / paso) * paso; m <= hasta; m += paso) minutos.add(m);
+    // Los bordes entran siempre, aunque no caigan en el paso: si el local abre 19:30,
+    // la primera hora para mirar es 19:30 y no 20:00.
+    minutos.add(desde);
+    minutos.add(hasta);
+  };
+
+  for (const franja of config.franjas) {
+    const desde = aMinutos(franja.desde);
+    const cierre = aMinutos(franja.hasta);
+    const cruza = cierre <= desde;
+
+    // Lo que abre este día, hasta la medianoche como mucho.
+    if (franja.dias.includes(dia)) agregar(desde, cruza ? 1440 : cierre);
+    // Y la cola de la noche de ayer, que en el reloj ya es este día.
+    if (cruza && franja.dias.includes(ayer)) agregar(0, cierre);
+  }
+
+  return [...minutos].sort((a, b) => a - b).map(aHHMM);
+}

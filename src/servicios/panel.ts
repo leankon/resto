@@ -1,6 +1,8 @@
 import type pg from 'pg';
 import { conTenant } from '../datos/conexion';
 import type { FormaMesa } from '../dominio/tipos';
+import { horasDeApertura } from '../dominio/agenda';
+import { cargarConfigTurnos, cargarTenant } from '../datos/repositorios';
 
 export interface ReservaDelDia {
   id: string;
@@ -27,9 +29,14 @@ export interface ReservaDelDia {
 /**
  * Reservas de un día, en la zona horaria del local.
  *
- * El día se calcula en hora local y no en UTC: para un bar que cierra a las 02:00,
- * la reserva de la 01:00 del domingo es parte del servicio del sábado y tiene que
- * aparecer en la planilla del sábado.
+ * El día se calcula en hora local y no en UTC: en UTC, una reserva de las 22:00 en
+ * Buenos Aires ya cae al día siguiente y la planilla del martes aparecería vacía.
+ *
+ * Agrupa por día de ALMANAQUE, no por día de servicio: la reserva de la 01:00 del
+ * domingo sale en la planilla del domingo, aunque para el bar sea la noche del sábado.
+ * Está pendiente decidir si conviene al revés —ver docs/05-preguntas-abiertas.md—; si
+ * cambia, tiene que cambiar junto con `ingresosPorBloque` y con las horas del plano,
+ * porque las tres tienen que contar el día igual.
  */
 export async function reservasDelDia(
   pool: pg.Pool,
@@ -317,5 +324,24 @@ export async function historial(
       en: f.en,
       datos: f.datos,
     }));
+  });
+}
+
+/**
+ * Las horas a las que se puede mirar el salón ese día, según el horario del local.
+ *
+ * Estaban fijas en la pantalla (13:00, 20:30, 21:00…). Para un local que abre 19:30 y
+ * cierra 02:00 eso significaba no poder ver nunca el salón después de las 23:00: una
+ * reserva de las 23:30 figuraba en la planilla y no aparecía en el plano por ningún
+ * lado. Ahora salen de las franjas de servicio configuradas.
+ */
+export async function horasDelPlano(
+  pool: pg.Pool,
+  tenantId: string,
+  fecha: string,
+): Promise<string[]> {
+  return conTenant(pool, tenantId, async (c) => {
+    const tenant = await cargarTenant(c, tenantId);
+    return horasDeApertura(fecha, await cargarConfigTurnos(c, tenant));
   });
 }

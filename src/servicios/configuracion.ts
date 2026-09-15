@@ -266,6 +266,39 @@ export async function guardarDuracion(
   return { tipo: 'ok' };
 }
 
+/**
+ * Pone la misma duración en todas las reglas de turno de un golpe.
+ *
+ * Un local que trabaja con turnos de dos horas parejos tenía que editar doce filas de a
+ * una para decirlo, y equivocarse en una sola deja un tamaño de grupo rotando distinto
+ * sin que nadie lo note. Las reglas siguen existiendo y se pueden afinar después: esto
+ * solo fija el punto de partida.
+ */
+export async function ponerDuracionPareja(
+  pool: pg.Pool,
+  tenantId: string,
+  duracionMin: number,
+  bufferMin: number,
+): Promise<ResultadoConfig> {
+  const error = validarDuracion({
+    franjaId: null, personasMin: 1, personasMax: 1, duracionMin, bufferMin,
+  });
+  if (error) return { tipo: 'invalido', motivo: error };
+
+  const { filas } = await conTenant(pool, tenantId, async (c) => {
+    const { rowCount } = await c.query(
+      `UPDATE duraciones_turno SET duracion_min = $2, buffer_min = $3 WHERE tenant_id = $1`,
+      [tenantId, duracionMin, bufferMin],
+    );
+    return { filas: rowCount ?? 0 };
+  });
+
+  if (filas === 0) {
+    return { tipo: 'invalido', motivo: 'Todavía no hay ninguna regla de turno que cambiar.' };
+  }
+  return { tipo: 'ok' };
+}
+
 export async function borrarDuracion(
   pool: pg.Pool,
   tenantId: string,

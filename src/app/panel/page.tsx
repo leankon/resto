@@ -1,15 +1,21 @@
 import Link from 'next/link';
 import { salir } from '../login/acciones';
 import { poolApp, requerirStaff } from '../../web/contexto';
-import { fechaCorta, hoyEn, instanteLocal, sumarDias } from '../../web/formato';
-import { estadoDelSalon, ingresosPorBloque, reservasDelDia } from '../../servicios/panel';
+import { fechaCorta, hora as horaDe, hoyEn, instanteLocal, sumarDias } from '../../web/formato';
+import {
+  estadoDelSalon,
+  horasDelPlano,
+  ingresosPorBloque,
+  reservasDelDia,
+  type ReservaDelDia,
+} from '../../servicios/panel';
 import Plano from './plano';
 import Tabla from './tabla';
 
 type Parametros = Promise<{ fecha?: string; salon?: string; hora?: string }>;
 
 export default async function Panel({ searchParams }: { searchParams: Parametros }) {
-  const { fecha: fechaCruda, salon: salonPedido, hora: horaPedida } = await searchParams;
+  const { fecha: fechaCruda, salon: salonPedido, hora: horaCruda } = await searchParams;
   const ctx = await requerirStaff();
   const esDuenio = ctx.sesion.rol === 'dueño';
   // El menú muestra solo lo que esta persona puede abrir: un botón que lleva a una
@@ -18,13 +24,24 @@ export default async function Panel({ searchParams }: { searchParams: Parametros
   const { tz } = ctx.tenant;
 
   const fecha = /^\d{4}-\d{2}-\d{2}$/.test(fechaCruda ?? '') ? fechaCruda! : hoyEn(tz);
-  const horaPlano = /^\d{2}:\d{2}$/.test(horaPedida ?? '') ? horaPedida! : '21:00';
+  const horaPedida = /^\d{2}:\d{2}$/.test(horaCruda ?? '') ? horaCruda! : null;
 
-  const [reservas, ingresos, salones] = await Promise.all([
+  const [reservas, ingresos, horasPosibles] = await Promise.all([
     reservasDelDia(poolApp(), ctx.tenantId, fecha),
     ingresosPorBloque(poolApp(), ctx.tenantId, fecha),
-    estadoDelSalon(poolApp(), ctx.tenantId, instanteLocal(fecha, horaPlano, tz)),
+    horasDelPlano(poolApp(), ctx.tenantId, fecha),
   ]);
+
+  // La hora que se mira por defecto: si el día es hoy y el local está abierto, ahora
+  // mismo. Si no, la primera reserva del día, que es lo que alguien quiere ver cuando
+  // abre la planilla de mañana. Antes era siempre 21:00, que para un local que abre a
+  // las 20:00 mostraba el salón vacío.
+  const horaPlano = horaPedida ?? horaPorDefecto(fecha, tz, horasPosibles, reservas);
+  const salones = await estadoDelSalon(
+    poolApp(),
+    ctx.tenantId,
+    instanteLocal(fecha, horaPlano, tz),
+  );
 
   const salonActivo = salones.find((s) => s.id === salonPedido) ?? salones[0];
   const pico = Math.max(1, ...ingresos.map((i) => i.personas));
@@ -128,11 +145,25 @@ export default async function Panel({ searchParams }: { searchParams: Parametros
               ))}
             </div>
             <div className="solapas" style={{ margin: 0, flex: '0 0 auto' }}>
-              {['13:00', '20:30', '21:00', '21:30', '22:00', '23:00'].map((h) => (
+              {/* La hora elegida siempre aparece, aunque sea una que no está en la
+                  grilla: si no, el botón marcado no existe y parece que no pasó nada. */}
+              {[...new Set([...horasPosibles, horaPlano])].sort().map((h) => (
                 <Link key={h} href={link({ hora: h })} aria-current={h === horaPlano ? 'page' : undefined}>
                   {h}
                 </Link>
               ))}
+              <form method="get" action="/panel" style={{ display: 'flex', gap: 4 }}>
+                <input type="hidden" name="fecha" value={fecha} />
+                {salonActivo && <input type="hidden" name="salon" value={salonActivo.id} />}
+                <input
+                  type="time"
+                  name="hora"
+                  defaultValue={horaPlano}
+                  aria-label="Ver el salón a otra hora"
+                  style={{ width: 118, marginTop: 0 }}
+                />
+                <button type="submit" className="secundario chico">Ver</button>
+              </form>
             </div>
           </div>
 
@@ -147,4 +178,29 @@ export default async function Panel({ searchParams }: { searchParams: Parametros
       </main>
     </>
   );
+}
+
+/**
+ * A qué hora mostrar el salón cuando nadie eligió una.
+ *
+ * Mirar el salón del día tiene dos usos distintos: durante el servicio, ver cómo está
+ * ahora; y al preparar un día futuro, ver el primer momento en que pasa algo. Una hora
+ * fija no sirve para ninguno de los dos.
+ */
+function horaPorDefecto(
+  fecha: string,
+  tz: string,
+  horasPosibles: string[],
+  reservas: ReservaDelDia[],
+): string {
+  if (fecha === hoyEn(tz)) {
+    const ahora = horaDe(new Date(), tz);
+    // Solo si el local está abierto: a las 9 de la mañana el salón vacío no dice nada.
+    if (horasPosibles.length > 0 && ahora >= horasPosibles[0]! && ahora <= horasPosibles.at(-1)!) {
+      return ahora;
+    }
+  }
+  const primera = reservas.find((r) => !['cancelada', 'no_show'].includes(r.estado));
+  if (primera) return horaDe(primera.inicio, tz);
+  return horasPosibles[0] ?? '21:00';
 }

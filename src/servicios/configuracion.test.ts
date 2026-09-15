@@ -3,8 +3,16 @@ import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 import { URL_ADMIN, pool } from '../datos/conexion';
 import { crearLocal, type LocalCreado } from '../datos/semilla';
 import {
-  borrarDuracion, borrarExcepcion, borrarFranja, cambiarActivaFranja, cargarConfiguracion,
-  guardarDuracion, guardarExcepcion, guardarFranja, renombrarLocal,
+  borrarDuracion,
+  borrarExcepcion,
+  borrarFranja,
+  cambiarActivaFranja,
+  cargarConfiguracion,
+  guardarDuracion,
+  guardarExcepcion,
+  guardarFranja,
+  ponerDuracionPareja,
+  renombrarLocal,
 } from './configuracion';
 import { crearReserva } from './reservas';
 
@@ -183,5 +191,29 @@ describe('datos del local', () => {
     expect(await renombrarLocal(app, local.tenantId, 'Bar Nuevo')).toEqual({ tipo: 'ok' });
     expect((await cargarConfiguracion(app, local.tenantId)).nombre).toBe('Bar Nuevo');
     expect(await renombrarLocal(app, local.tenantId, '   ')).toMatchObject({ tipo: 'invalido' });
+  });
+});
+
+describe('ponerDuracionPareja', () => {
+  it('deja todas las reglas con la misma duración de un golpe', async () => {
+    const antes = await cargarConfiguracion(app, local.tenantId);
+    expect(new Set(antes.duraciones.map((d) => d.duracionMin)).size).toBeGreaterThan(1);
+
+    expect(await ponerDuracionPareja(app, local.tenantId, 120, 20)).toEqual({ tipo: 'ok' });
+
+    const despues = await cargarConfiguracion(app, local.tenantId);
+    expect(despues.duraciones.every((d) => d.duracionMin === 120)).toBe(true);
+    expect(despues.duraciones.every((d) => d.bufferMin === 20)).toBe(true);
+    // No borra reglas: los tramos por tamaño de grupo siguen ahí para afinarlos después.
+    expect(despues.duraciones).toHaveLength(antes.duraciones.length);
+  });
+
+  it('rechaza una duración absurda sin tocar nada', async () => {
+    await ponerDuracionPareja(app, local.tenantId, 120, 15);
+    const resultado = await ponerDuracionPareja(app, local.tenantId, 5, 15);
+
+    expect(resultado).toMatchObject({ tipo: 'invalido' });
+    const config = await cargarConfiguracion(app, local.tenantId);
+    expect(config.duraciones.every((d) => d.duracionMin === 120)).toBe(true);
   });
 });
