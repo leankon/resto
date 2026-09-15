@@ -1,0 +1,119 @@
+:root {
+  --fondo: #faf9f7;
+  --panel: #ffffff;
+  --borde: #e4e1db;
+  --texto: #1c1a17;
+  --suave: #6b665e;
+  --acento: #1f5f4b;
+  --acento-suave: #e8f1ed;
+  --alerta: #9a3412;
+  --alerta-suave: #fdf0e8;
+  --radio: 8px;
+  color-scheme: light;
+}
+
+* { box-sizing: border-box; }
+
+body {
+  margin: 0;
+  background: var(--fondo);
+  color: var(--texto);
+  font: 15px/1.5 ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+}
+
+a { color: var(--acento); }
+
+.barra {
+  display: flex; align-items: center; gap: 16px; flex-wrap: wrap;
+  padding: 12px 20px; background: var(--panel); border-bottom: 1px solid var(--borde);
+}
+.barra .marca { font-weight: 650; margin-right: auto; }
+.barra .quien { color: var(--suave); font-size: 13px; }
+
+.contenido { max-width: 1100px; margin: 0 auto; padding: 20px; }
+.contenido.angosto { max-width: 460px; }
+
+.tarjeta {
+  background: var(--panel); border: 1px solid var(--borde);
+  border-radius: var(--radio); padding: 18px; margin-bottom: 18px;
+}
+.tarjeta h2 { margin: 0 0 14px; font-size: 15px; letter-spacing: .01em; }
+
+label { display: block; margin-bottom: 12px; font-size: 13px; color: var(--suave); }
+input, select, textarea {
+  display: block; width: 100%; margin-top: 4px; padding: 9px 10px;
+  border: 1px solid var(--borde); border-radius: 6px; background: #fff;
+  font: inherit; color: inherit;
+}
+input:focus, select:focus { outline: 2px solid var(--acento-suave); border-color: var(--acento); }
+
+button, .boton {
+  display: inline-block; padding: 9px 14px; border: 1px solid var(--acento);
+  border-radius: 6px; background: var(--acento); color: #fff;
+  font: inherit; font-size: 14px; cursor: pointer; text-decoration: none;
+}
+button.secundario, .boton.secundario {
+  background: #fff; color: var(--texto); border-color: var(--borde);
+}
+button.chico, .boton.chico { padding: 4px 9px; font-size: 13px; }
+button:disabled { opacity: .5; cursor: default; }
+
+table { width: 100%; border-collapse: collapse; font-size: 14px; }
+th {
+  text-align: left; font-size: 12px; font-weight: 600; color: var(--suave);
+  text-transform: uppercase; letter-spacing: .04em;
+  padding: 6px 10px; border-bottom: 1px solid var(--borde);
+}
+td { padding: 10px; border-bottom: 1px solid var(--borde); vertical-align: top; }
+tr:last-child td { border-bottom: none; }
+tr.pasada td { color: var(--suave); }
+
+.pastilla {
+  display: inline-block; padding: 2px 8px; border-radius: 999px;
+  font-size: 12px; background: var(--acento-suave); color: var(--acento);
+  white-space: nowrap;
+}
+.pastilla.gris { background: #f0eeea; color: var(--suave); }
+.pastilla.alerta { background: var(--alerta-suave); color: var(--alerta); }
+
+.solapas { display: flex; gap: 6px; margin-bottom: 14px; flex-wrap: wrap; }
+.solapas a {
+  padding: 6px 12px; border: 1px solid var(--borde); border-radius: 999px;
+  text-decoration: none; color: var(--suave); background: #fff; font-size: 14px;
+}
+.solapas a[aria-current="page"] {
+  background: var(--acento); border-color: var(--acento); color: #fff;
+}
+
+.mesas { display: flex; flex-wrap: wrap; gap: 10px; }
+.mesa {
+  min-width: 96px; padding: 10px; border-radius: var(--radio);
+  border: 1px solid var(--borde); background: #fff;
+}
+.mesa.ocupada { border-color: var(--acento); background: var(--acento-suave); }
+.mesa .nombre { font-weight: 650; }
+.mesa .detalle { font-size: 12px; color: var(--suave); }
+
+.ingresos { display: flex; align-items: stretch; gap: 4px; height: 110px; }
+.ingresos .bloque {
+  flex: 1; height: 100%;
+  display: flex; flex-direction: column; justify-content: flex-end;
+}
+.ingresos .cifra { font-size: 11px; color: var(--suave); text-align: center; margin-bottom: 3px; }
+.ingresos .barrita { background: var(--acento); border-radius: 3px 3px 0 0; min-height: 3px; }
+.ingresos .etiqueta {
+  font-size: 10px; color: var(--suave); text-align: center;
+  margin-top: 4px; white-space: nowrap;
+}
+
+.aviso {
+  padding: 10px 12px; border-radius: 6px; font-size: 14px; margin-bottom: 14px;
+  background: var(--alerta-suave); color: var(--alerta); border: 1px solid #f3d5c3;
+}
+.aviso.ok { background: var(--acento-suave); color: var(--acento); border-color: #c9e0d6; }
+
+.acciones { display: flex; gap: 6px; flex-wrap: wrap; }
+.vacio { color: var(--suave); padding: 24px 10px; text-align: center; }
+.fila { display: flex; gap: 12px; align-items: flex-end; flex-wrap: wrap; }
+.fila > * { flex: 1; min-width: 140px; }
+.apagado { color: var(--suave); font-size: 13px; }

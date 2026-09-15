@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import { ALMUERZO, CENA, TZ, local } from './fixtures.js';
-import { reglasSembradas, resolverTurno, type ConfigTurnos } from './turnos.js';
+import { ALMUERZO, CENA, TZ, local } from './fixtures';
+import { reglasSembradas, resolverTurno, type ConfigTurnos } from './turnos';
 
 const config: ConfigTurnos = {
   tz: TZ,

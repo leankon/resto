@@ -1,15 +1,15 @@
 import pg from 'pg';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
-import { URL_ADMIN, URL_AUTH } from '../datos/conexion.js';
-import { crearLocal } from '../datos/semilla.js';
-import { crearUsuarioStaff } from './administracion.js';
+import { URL_ADMIN, URL_AUTH } from '../datos/conexion';
+import { crearLocal } from '../datos/semilla';
+import { crearUsuarioStaff } from './administracion';
 import {
   cerrarSesion,
   elegirLocal,
   limpiarSesionesVencidas,
   login,
   sesionActual,
-} from './auth.js';
+} from './auth';
 
 const admin = new pg.Pool({ connectionString: URL_ADMIN });
 const auth = new pg.Pool({ connectionString: URL_AUTH });

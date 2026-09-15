@@ -1,5 +1,5 @@
 import type pg from 'pg';
-import { generarToken, hashearPassword, hashearToken, verificarPassword } from '../dominio/passwords.js';
+import { generarToken, hashearPassword, hashearToken, verificarPassword } from '../dominio/passwords';
 
 /** Un turno largo. Al staff no le sirve que la sesión se corte en medio del servicio. */
 const HORAS_DE_SESION = 12;

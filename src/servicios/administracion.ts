@@ -1,6 +1,6 @@
 import type pg from 'pg';
-import { hashearPassword } from '../dominio/passwords.js';
-import { crearLocal, type LocalCreado, type LocalNuevo } from '../datos/semilla.js';
+import { hashearPassword } from '../dominio/passwords';
+import { crearLocal, type LocalCreado, type LocalNuevo } from '../datos/semilla';
 
 /**
  * Operaciones del panel de super-admin.

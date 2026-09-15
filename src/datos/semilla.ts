@@ -1,5 +1,5 @@
 import type pg from 'pg';
-import { reglasSembradas } from '../dominio/turnos.js';
+import { reglasSembradas } from '../dominio/turnos';
 
 export interface MesaNueva {
   nombre: string;

@@ -13,14 +13,42 @@ Postgres estándar, así que lo que corre local corre igual en Supabase, Neon o 
 ```bash
 npm install
 npm run db:start     # levanta Postgres, crea la base y aplica migraciones
-npm test             # 49 tests: motor de asignación + invariantes del esquema
+npm run db:demo      # carga un local de prueba con reservas
+npm run dev          # panel en http://localhost:3000
+
+npm test             # 107 tests
 npm run test:unit    # solo el motor, sin base de datos
+npm run humo         # recorrido de humo en navegador (requiere el server andando)
 ```
+
+Usuarios de prueba que deja `db:demo`:
+
+| Dónde | Usuario | Contraseña |
+|---|---|---|
+| Panel del local (`/login`) | `duenio@bardemo.test` | `bar-demo-123` |
+| Plataforma (`/admin/login`) | `admin@plataforma.test` | `plataforma-123` |
 
 ## Estado
 
-Fase 1 en curso. Listo el motor de asignación (`src/dominio/`) y el esquema con sus dos
-invariantes (`src/datos/`). Falta el caso de uso transaccional, auth de staff y el panel.
+**Fase 1 completa.** Motor de asignación, esquema con sus dos invariantes, caso de uso
+transaccional, login de staff, panel del local y panel de super-admin.
+
+Sigue la Fase 2: web pública de reservas y widget embebible.
+
+## Cómo está organizado
+
+```
+src/
+  dominio/      lógica pura, sin I/O: motor, turnos, combinaciones, identidad, passwords
+  datos/        esquema SQL, migraciones, repositorios, conexiones por rol
+  servicios/    casos de uso: reservas, auth, panel, administración
+  web/          helpers del panel: sesión, formato de fecha y hora
+  app/          pantallas (Next.js App Router)
+```
+
+Todo lo que vive en `dominio/` es función pura: recibe datos, devuelve decisiones. No
+toca la base, no conoce transacciones, no sabe qué es un tenant. Es lo que permite
+testear el motor sin levantar un servidor.
 
 ## Documentos de decisión
 

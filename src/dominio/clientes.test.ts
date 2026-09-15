@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { identificar, normalizarEmail, normalizarTelefono } from './clientes.js';
+import { identificar, normalizarEmail, normalizarTelefono } from './clientes';
 
 describe('normalizarTelefono', () => {
   it('reconoce el mismo celular argentino tipeado de cualquier manera', () => {

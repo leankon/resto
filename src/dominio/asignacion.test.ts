@@ -1,8 +1,8 @@
 import { describe, expect, it } from 'vitest';
-import { asignar, buscarAlternativas, type Pedido } from './asignacion.js';
-import { derivarCandidatos } from './combinaciones.js';
-import { SALON, local } from './fixtures.js';
-import { CONFIG_POR_DEFECTO, type Ocupacion } from './tipos.js';
+import { asignar, buscarAlternativas, type Pedido } from './asignacion';
+import { derivarCandidatos } from './combinaciones';
+import { SALON, local } from './fixtures';
+import { CONFIG_POR_DEFECTO, type Ocupacion } from './tipos';
 
 const candidatos = derivarCandidatos(SALON, CONFIG_POR_DEFECTO);
 

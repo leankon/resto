@@ -1,8 +1,8 @@
 import pg from 'pg';
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
-import { URL_ADMIN, pool } from '../datos/conexion.js';
-import { SALON_DEMO, crearLocal, type LocalCreado } from '../datos/semilla.js';
-import { cambiarEstado, crearReserva, ocuparMesa, reasignarMesa } from './reservas.js';
+import { URL_ADMIN, pool } from '../datos/conexion';
+import { SALON_DEMO, crearLocal, type LocalCreado } from '../datos/semilla';
+import { cambiarEstado, crearReserva, ocuparMesa, reasignarMesa } from './reservas';
 
 const admin = new pg.Pool({ connectionString: URL_ADMIN });
 const app = pool();

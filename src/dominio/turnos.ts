@@ -1,5 +1,5 @@
-import type { DiaSemana, FranjaServicio, Id, Minutos, ReglaDuracion } from './tipos.js';
-import { aMinutos, horaLocal } from './tiempo.js';
+import type { DiaSemana, FranjaServicio, Id, Minutos, ReglaDuracion } from './tipos';
+import { aMinutos, horaLocal } from './tiempo';
 
 export interface ConfigTurnos {
   /** IANA, ej. "America/Argentina/Buenos_Aires". */

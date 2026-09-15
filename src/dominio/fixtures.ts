@@ -1,4 +1,4 @@
-import type { DiaSemana, FranjaServicio, Mesa } from './tipos.js';
+import type { DiaSemana, FranjaServicio, Mesa } from './tipos';
 
 /**
  * Salón de prueba. Las posiciones están elegidas a propósito para que las combinaciones

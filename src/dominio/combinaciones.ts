@@ -1,4 +1,4 @@
-import type { Centimetros, ConfigAsignacion, Id, Mesa } from './tipos.js';
+import type { Centimetros, ConfigAsignacion, Id, Mesa } from './tipos';
 
 /**
  * Una mesa o un conjunto de mesas que se pueden unir, con su capacidad y su costo.

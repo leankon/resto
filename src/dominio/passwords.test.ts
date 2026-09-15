@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { generarToken, hashearPassword, verificarPassword } from './passwords.js';
+import { generarToken, hashearPassword, verificarPassword } from './passwords';
 
 describe('passwords', () => {
   it('acepta la contraseña correcta y rechaza cualquier otra', async () => {

@@ -4,12 +4,12 @@ import {
   asignar,
   buscarAlternativas,
   type Alternativa,
-} from '../dominio/asignacion.js';
-import { identificar, type DatosContacto } from '../dominio/clientes.js';
-import { derivarCandidatos } from '../dominio/combinaciones.js';
-import { fechaLocal, sumarMinutos } from '../dominio/tiempo.js';
-import { resolverTurno } from '../dominio/turnos.js';
-import { conTenant, esSolape, lockDelDia } from '../datos/conexion.js';
+} from '../dominio/asignacion';
+import { identificar, type DatosContacto } from '../dominio/clientes';
+import { derivarCandidatos } from '../dominio/combinaciones';
+import { fechaLocal, sumarMinutos } from '../dominio/tiempo';
+import { resolverTurno } from '../dominio/turnos';
+import { conTenant, esSolape, lockDelDia } from '../datos/conexion';
 import {
   buscarOCrearCliente,
   cargarConfigAsignacion,
@@ -22,7 +22,7 @@ import {
   registrarEvento,
   type Actor,
   type ClienteGuardado,
-} from '../datos/repositorios.js';
+} from '../datos/repositorios';
 
 /** Margen alrededor del turno: cubre el buffer y la búsqueda de horarios alternativos. */
 const VENTANA_HORAS = 8;

@@ -1,6 +1,6 @@
 import pg from 'pg';
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
-import { URL_ADMIN, conTenant, esSolape, pool } from './conexion.js';
+import { URL_ADMIN, conTenant, esSolape, pool } from './conexion';
 
 const admin = new pg.Pool({ connectionString: URL_ADMIN });
 const app = pool();

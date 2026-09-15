@@ -76,3 +76,13 @@ export function identificar(datos: DatosContacto, pais: string): IdentidadClient
   if (email) return { tipo: 'email', email, nombre };
   return { tipo: 'sin_contacto' };
 }
+
+/**
+ * Teléfono como lo lee una persona. En la base se guarda siempre en E.164; esto es
+ * solo para mostrarlo, porque `+5491188887777` no se puede dictar por teléfono.
+ */
+export function telefonoLegible(e164: string | null | undefined): string {
+  if (!e164) return '';
+  const numero = parsePhoneNumberFromString(e164);
+  return numero?.formatInternational() ?? e164;
+}

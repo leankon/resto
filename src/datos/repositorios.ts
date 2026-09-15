@@ -1,5 +1,5 @@
 import type pg from 'pg';
-import type { ParVetado } from '../dominio/combinaciones.js';
+import type { ParVetado } from '../dominio/combinaciones';
 import type {
   ConfigAsignacion,
   DiaSemana,
@@ -7,9 +7,9 @@ import type {
   Mesa,
   Ocupacion,
   ReglaDuracion,
-} from '../dominio/tipos.js';
-import { CONFIG_POR_DEFECTO } from '../dominio/tipos.js';
-import type { ConfigTurnos } from '../dominio/turnos.js';
+} from '../dominio/tipos';
+import { CONFIG_POR_DEFECTO } from '../dominio/tipos';
+import type { ConfigTurnos } from '../dominio/turnos';
 
 export interface DatosTenant {
   id: string;

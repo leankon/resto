@@ -1,0 +1,137 @@
+import pg from 'pg';
+import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
+import { URL_ADMIN, pool } from '../datos/conexion';
+import { SALON_DEMO, crearLocal, type LocalCreado } from '../datos/semilla';
+import { estadoDelSalon, historial, ingresosPorBloque, reservasDelDia } from './panel';
+import { crearReserva, ocuparMesa, reasignarMesa } from './reservas';
+
+const admin = new pg.Pool({ connectionString: URL_ADMIN });
+const app = pool();
+const STAFF = { tipo: 'staff' as const, id: null };
+let local: LocalCreado;
+
+const cena = (hora: string) => new Date(`2026-10-10T${hora}:00-03:00`);
+
+beforeAll(async () => {
+  local = await crearLocal(admin, {
+    slug: `panel-${Date.now()}`, nombre: 'Bar Panel', salones: SALON_DEMO,
+  });
+});
+beforeEach(async () => {
+  await admin.query('DELETE FROM reservas WHERE tenant_id = $1', [local.tenantId]);
+  await admin.query('DELETE FROM clientes WHERE tenant_id = $1', [local.tenantId]);
+});
+afterAll(async () => {
+  await admin.query('DELETE FROM tenants WHERE id = $1', [local.tenantId]);
+  await Promise.all([admin.end(), app.end()]);
+});
+
+const reservar = (hora: string, personas = 2, nombre = 'Ana', telefono = '1123456789') =>
+  crearReserva(app, {
+    tenantId: local.tenantId,
+    inicio: cena(hora),
+    personas,
+    canalOrigen: 'manual',
+    actor: STAFF,
+    contacto: { nombre, telefono },
+  });
+
+describe('reservasDelDia', () => {
+  it('trae las reservas del día con su mesa y su cliente', async () => {
+    await reservar('21:00');
+    const dia = await reservasDelDia(app, local.tenantId, '2026-10-10');
+
+    expect(dia).toHaveLength(1);
+    expect(dia[0]).toMatchObject({ personas: 2, estado: 'confirmada', canalOrigen: 'manual' });
+    expect(dia[0]!.mesas).toHaveLength(1);
+    expect(dia[0]!.cliente).toMatchObject({ nombre: 'Ana', visitas: 0 });
+    expect(dia[0]!.salon).toBe('Planta baja');
+  });
+
+  it('la reserva de la 01:00 pertenece al servicio de la noche anterior', async () => {
+    // Un bar que cierra a las 02:00 no arma una planilla nueva a la medianoche.
+    await crearReserva(app, {
+      tenantId: local.tenantId,
+      inicio: new Date('2026-10-11T00:30:00-03:00'),
+      personas: 2, canalOrigen: 'manual', actor: STAFF,
+      contacto: { nombre: 'Trasnochador', telefono: '1155551234' },
+    });
+
+    // Sale en el día calendario local que corresponde, no en UTC (donde ya sería el 11).
+    const once = await reservasDelDia(app, local.tenantId, '2026-10-11');
+    expect(once).toHaveLength(1);
+    expect(await reservasDelDia(app, local.tenantId, '2026-10-10')).toHaveLength(0);
+  });
+
+  it('ordena por horario', async () => {
+    await reservar('22:00', 2, 'Tarde', '1155550001');
+    await reservar('20:30', 2, 'Temprano', '1155550002');
+    const dia = await reservasDelDia(app, local.tenantId, '2026-10-10');
+    expect(dia.map((r) => r.cliente?.nombre)).toEqual(['Temprano', 'Tarde']);
+  });
+
+  it('un walk-in aparece en la planilla sin cliente', async () => {
+    await ocuparMesa(app, {
+      tenantId: local.tenantId, mesaIds: [local.mesas['1']!], personas: 3,
+      inicio: cena('21:00'), actor: STAFF,
+    });
+    const dia = await reservasDelDia(app, local.tenantId, '2026-10-10');
+    expect(dia[0]).toMatchObject({ canalOrigen: 'walk_in', cliente: null, personas: 3 });
+  });
+});
+
+describe('ingresosPorBloque', () => {
+  it('agrupa la gente que entra en bloques de 15 minutos', async () => {
+    await reservar('21:00', 2, 'A', '1155550011');
+    await reservar('21:10', 4, 'B', '1155550012');
+    await reservar('21:30', 6, 'C', '1155550013');
+
+    const bloques = await ingresosPorBloque(app, local.tenantId, '2026-10-10');
+    expect(bloques).toEqual([
+      { hora: '21:00', personas: 6, reservas: 2 },
+      { hora: '21:30', personas: 6, reservas: 1 },
+    ]);
+  });
+
+  it('no cuenta las canceladas ni las ausencias', async () => {
+    const creada = await reservar('21:00');
+    if (creada.tipo !== 'creada') throw new Error('no asignó');
+    await admin.query(`UPDATE reservas SET estado = 'cancelada' WHERE id = $1`, [creada.reservaId]);
+
+    expect(await ingresosPorBloque(app, local.tenantId, '2026-10-10')).toEqual([]);
+  });
+});
+
+describe('estadoDelSalon', () => {
+  it('devuelve un salón por piso, con las mesas ocupadas marcadas', async () => {
+    await reservar('21:00');
+    const salones = await estadoDelSalon(app, local.tenantId, cena('21:30'));
+
+    expect(salones.map((s) => s.nombre)).toEqual(['Planta baja', 'Terraza']);
+    const ocupadas = salones.flatMap((s) => s.mesas.filter((m) => m.ocupadaPor));
+    expect(ocupadas).toHaveLength(1);
+    expect(ocupadas[0]!.ocupadaPor).toMatchObject({ cliente: 'Ana', personas: 2 });
+  });
+
+  it('a una hora sin reservas el salón está entero libre', async () => {
+    await reservar('21:00');
+    const salones = await estadoDelSalon(app, local.tenantId, cena('12:30'));
+    expect(salones.flatMap((s) => s.mesas).every((m) => !m.ocupadaPor)).toBe(true);
+  });
+});
+
+describe('historial', () => {
+  it('cuenta quién movió la reserva y de dónde a dónde', async () => {
+    const creada = await reservar('21:00');
+    if (creada.tipo !== 'creada') throw new Error('no asignó');
+
+    await reasignarMesa(app, {
+      tenantId: local.tenantId, reservaId: creada.reservaId,
+      mesaIds: [local.mesas['5']!], motivo: 'pidió ventana', actor: STAFF,
+    });
+
+    const eventos = await historial(app, local.tenantId, creada.reservaId);
+    expect(eventos.map((e) => e.tipo)).toEqual(['creada', 'asignada_auto', 'reasignada_manual']);
+    expect(eventos[2]!.datos).toMatchObject({ despues: ['5'], motivo: 'pidió ventana' });
+  });
+});

@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
-import { derivarCandidatos } from './combinaciones.js';
-import { SALON } from './fixtures.js';
-import { CONFIG_POR_DEFECTO } from './tipos.js';
+import { derivarCandidatos } from './combinaciones';
+import { SALON } from './fixtures';
+import { CONFIG_POR_DEFECTO } from './tipos';
 
 const candidatos = derivarCandidatos(SALON, CONFIG_POR_DEFECTO);
 const claves = new Set(candidatos.map((c) => c.clave));

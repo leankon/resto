@@ -1,4 +1,4 @@
-import type { DiaSemana } from './tipos.js';
+import type { DiaSemana } from './tipos';
 
 /** Convierte "HH:MM" a minutos desde medianoche. */
 export function aMinutos(hhmm: string): number {

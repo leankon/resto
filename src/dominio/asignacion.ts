@@ -1,6 +1,6 @@
-import { compararNatural, type Candidato } from './combinaciones.js';
-import type { ConfigAsignacion, Id, Mesa, Minutos, Ocupacion, Periodo } from './tipos.js';
-import { seSolapan, sumarMinutos } from './tiempo.js';
+import { compararNatural, type Candidato } from './combinaciones';
+import type { ConfigAsignacion, Id, Mesa, Minutos, Ocupacion, Periodo } from './tipos';
+import { seSolapan, sumarMinutos } from './tiempo';
 
 export const VERSION_ALGORITMO = '1.0.0';
 
