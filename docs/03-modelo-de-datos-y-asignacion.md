@@ -148,9 +148,17 @@ la hora de **inicio**, no por la de fin. Simple y predecible.
      del otro extremo".
    - `cabeceras` = sillas de punta usadas × peso. Real pero menos cómodo: se prefiere una
      mesa que alcance sin agregar sillas.
-   - `escasez`: penalizar consumir una mesa que es de las pocas que sirven para grupos
-     grandes. Se calcula como "cuántos tamaños de grupo quedarían sin opción si uso esta".
-     Es lo que evita regalar la mesa de 8 a una pareja.
+   - `escasez`: **recargo sobre el desperdicio**, no un costo aparte. Desperdiciar una
+     silla en una mesa escasa cuesta más que desperdiciarla en una mesa común.
+     `desperdicio × rareza × peso`, donde `rareza = 1 / (cantidad de mesas de esa
+     capacidad o mayor)`.
+
+     Que sea un recargo y no un sumando es importante, y lo descubrimos testeando:
+     sumada suelta, la escasez diferenciaba candidatos que **no desperdician nada**, y
+     dos opciones igual de buenas quedaban separadas por décimas — la elección pasaba a
+     ser arbitraria y cualquier cambio menor del plano la daba vuelta. Como recargo, la
+     regla queda clara: **ocupar la mesa de 8 con un grupo de 8 no tiene penalidad
+     ninguna; el problema es ocuparla con un grupo de 6.**
    - `fragmentacion`: si usar este candidato deja un hueco libre más corto que la duración
      mínima de un turno, ese hueco es capacidad muerta. Penalizar.
    - `preferencia`: zona/nivel pedido por el cliente o configurado por el local.
