@@ -11,10 +11,14 @@ tiene pantalla. Para abrir el panel desde afuera hacen falta las dos cosas:
 | Pieza | Para qué | Cuánto tarda |
 |---|---|---|
 | Postgres gestionado (Neon o Supabase) | guardar los datos | ~5 min |
-| Hosting de la app (Railway, Fly o Vercel) | servir las pantallas | ~10 min |
+| Hosting de la app (Vercel, Railway o Fly) | servir las pantallas | ~10 min |
 
 Con la base sola, el panel sigue existiendo únicamente en la máquina donde corre
 `npm run dev`.
+
+**Hasta que el proyecto facture, todo esto va en plan gratuito: Neon free + Vercel
+Hobby, USD 0.** Es la decisión tomada y el resto del documento la asume. Pagar
+infraestructura antes de tener un local suscripto es gasto sin contrapartida.
 
 ## 1. La base
 
@@ -63,13 +67,26 @@ Lo que el esquema **no** necesita, y por eso se puede desplegar:
 
 ## 2. El hosting
 
-**Railway** o **Fly.io**: un contenedor siempre encendido, del orden de USD 5 por mes.
+**Vercel, plan Hobby.** Gratis y es el camino más corto para Next.js: conectás el repo
+y listo.
 
-**Vercel** también sirve **para ver el panel ahora**, y es el camino más corto para
-Next.js. La advertencia del doc 02 sigue en pie pero es de la Fase 3: el webhook de
-WhatsApp no puede vivir en una función con arranque en frío, porque Meta espera
-respuesta en pocos segundos y reintenta, y un reintento puede terminar en una reserva
-duplicada. Para eso vamos a necesitar un proceso siempre encendido igual.
+Dos cosas para tener presentes, ninguna bloquea nada hoy:
+
+- **Hobby es para uso no comercial.** Mientras es tu proyecto está todo bien. El día
+  que le cobres a un local, corresponde pasar a Pro.
+- **En Fase 3 el webhook de WhatsApp necesita un proceso siempre encendido.** Meta
+  espera respuesta en pocos segundos y reintenta, y un reintento puede terminar en una
+  reserva duplicada; los recordatorios programados tampoco entran en el cron limitado
+  del plan gratuito. Cuando lleguemos ahí se resuelve sumando un servicio chico aparte
+  solo para eso, y el panel se queda donde está.
+
+Eso es una decisión de infraestructura, no de código: **no cambia una línea de lo que
+está escrito**. `src/dominio` no importa nada de Next.js y los servicios tampoco, así
+que mover el webhook y los jobs a otro proceso es mover carpetas.
+
+Si algún día preferís tener todo en una sola pieza, **Railway o Fly** corren un
+contenedor siempre encendido por unos USD 5 al mes y el webhook entra ahí sin servicio
+extra. Es la opción para cuando haya con qué pagarla.
 
 Variables de entorno a cargar, las tres:
 
