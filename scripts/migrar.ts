@@ -37,13 +37,68 @@ if (!url) {
 const carpeta = join(dirname(fileURLToPath(import.meta.url)), '..', 'src', 'datos', 'migraciones');
 const archivos = readdirSync(carpeta).filter((f) => f.endsWith('.sql')).sort();
 
-const esLocal = /@(localhost|127\.0\.0\.1)[:/]/.test(url);
+/**
+ * Revisa que la variable tenga forma de cadena de conexión antes de intentar conectarse.
+ *
+ * Sin esto, pegar cualquier otra cosa en la variable da un error de DNS —
+ * `getaddrinfo ENOTFOUND base`— que no dice nada sobre lo que en realidad pasó: que el
+ * valor no es una conexión a Postgres. El nombre del servidor se muestra porque es lo
+ * que delata el error de copiado, y la contraseña nunca se imprime.
+ */
+function revisarLaUrl(valor: string): URL {
+  // Se corta con un mensaje y nada más: un stack trace de Node arriba del texto lo
+  // esconde justo cuando alguien está buscando qué hacer.
+  const cortar = (mensaje: string): never => {
+    console.error(`migraciones: ${mensaje}`);
+    process.exit(1);
+  };
+
+  let partes: URL;
+  try {
+    partes = new URL(valor);
+  } catch {
+    return cortar(
+      'DATABASE_URL_OWNER no tiene forma de cadena de conexión.\n' +
+        '  Tiene que empezar con "postgresql://" y ser el texto completo, sin comillas,\n' +
+        '  sin saltos de línea y sin el nombre de la variable adelante.',
+    );
+  }
+
+  if (!/^postgres(ql)?:$/.test(partes.protocol)) {
+    return cortar(
+      `DATABASE_URL_OWNER empieza con "${partes.protocol}//" y tiene que empezar con "postgresql://".`,
+    );
+  }
+  // Un host de Postgres real siempre tiene puntos (o es localhost). Una sola palabra
+  // suelta es texto que se coló en el copiado.
+  if (!partes.hostname.includes('.') && !/^(localhost|127\.0\.0\.1)$/.test(partes.hostname)) {
+    return cortar(
+      `DATABASE_URL_OWNER apunta a un servidor llamado "${partes.hostname}", que no existe.\n` +
+        '  Parece que quedó texto pegado en vez de la conexión. Copiala entera desde\n' +
+        '  Neon (Connect → rol que termina en "_owner") y volvé a cargarla en Vercel.',
+    );
+  }
+  return partes;
+}
+
+const partes = revisarLaUrl(url);
+const esLocal = /^(localhost|127\.0\.0\.1)$/.test(partes.hostname);
 const cliente = new pg.Client({
   connectionString: url,
   ...(esLocal ? {} : { ssl: { rejectUnauthorized: false } }),
 });
 
-await cliente.connect();
+try {
+  await cliente.connect();
+} catch (error) {
+  // El host y el usuario ayudan a ver el error de copiado de un vistazo; la contraseña
+  // no se imprime nunca, porque los logs de build los lee cualquiera del equipo.
+  console.error(
+    `migraciones: no se pudo conectar a ${partes.hostname} como "${partes.username}" ` +
+      `a la base "${partes.pathname.slice(1)}".`,
+  );
+  throw error;
+}
 try {
   await cliente.query(`
     CREATE TABLE IF NOT EXISTS migraciones_aplicadas (
