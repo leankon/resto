@@ -8,6 +8,13 @@ import pg from 'pg';
 export const URL_APP =
   process.env['DATABASE_URL'] ?? 'postgres://resto_app:dev@localhost:5433/resto';
 
+/**
+ * Rol del login. Ignora RLS porque hay que encontrar al usuario antes de saber a qué
+ * local pertenece, pero solo tiene permisos sobre las tablas de autenticación.
+ */
+export const URL_AUTH =
+  process.env['DATABASE_URL_AUTH'] ?? 'postgres://resto_auth:dev@localhost:5433/resto';
+
 /** Solo para migraciones y para el panel de super-admin. */
 export const URL_ADMIN =
   process.env['DATABASE_URL_ADMIN'] ?? 'postgres://postgres@localhost:5433/resto';
