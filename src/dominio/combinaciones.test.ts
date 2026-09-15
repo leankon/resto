@@ -77,11 +77,37 @@ describe('derivarCandidatos', () => {
     expect(buscar('t2+t2b')?.capacidadMin).toBe(3);
   });
 
-  it('mide cuánto hay que arrimar las mesas, sumando el recorrido de la cadena', () => {
-    expect(buscar('t2+t2b')?.distanciaCm).toBe(200);
-    expect(buscar('t2b+t2c')?.distanciaCm).toBe(220);
-    expect(buscar('t2+t2b+t2c')?.distanciaCm).toBe(420); // 200 + 220, no 420 en línea recta
+  it('mide cuánto hay que arrimar las mesas hasta que se toquen', () => {
+    // Entre bordes, no entre centros: t2 y t2b tienen los centros a 200 cm pero miden
+    // 70 cm cada una, así que para juntarlas hay que moverlas 130.
+    expect(buscar('t2+t2b')?.distanciaCm).toBe(130);
+    expect(buscar('t2b+t2c')?.distanciaCm).toBe(150);
+    expect(buscar('t2+t2b+t2c')?.distanciaCm).toBe(280); // 130 + 150, encadenadas
     expect(buscar('t6')?.distanciaCm).toBe(0);
+  });
+
+  it('dos mesas grandes pegadas se pueden unir', () => {
+    // El error que esto evita: midiendo de centro a centro, dos mesas de ocho tocándose
+    // tienen los centros a casi tres metros y el sistema no las unía nunca, mientras que
+    // dos mesas de dos a la misma distancia real sí. Las mesas grandes, que son
+    // justamente las que se juntan para los grupos grandes, quedaban afuera.
+    const grandes = [
+      { ...SALON[0]!, id: 'g1', nombre: 'g1', capacidadBase: 8, x: 0, y: 0 },
+      { ...SALON[0]!, id: 'g2', nombre: 'g2', capacidadBase: 8, x: 300, y: 0 },
+    ];
+    const combo = derivarCandidatos(grandes, CONFIG_POR_DEFECTO).find((c) => c.clave === 'g1+g2');
+    expect(combo).toBeDefined();
+    expect(combo?.distanciaCm).toBe(20); // 300 de centro a centro, 280 de ancho entre las dos
+    expect(combo?.capacidadMax).toBe(16);
+  });
+
+  it('dos mesas superpuestas están a distancia cero', () => {
+    const encimadas = [
+      { ...SALON[0]!, id: 'a', nombre: 'a', x: 100, y: 100 },
+      { ...SALON[0]!, id: 'b', nombre: 'b', x: 100, y: 100 },
+    ];
+    expect(derivarCandidatos(encimadas, CONFIG_POR_DEFECTO).find((c) => c.clave === 'a+b'))
+      .toMatchObject({ distanciaCm: 0 });
   });
 
   it('no se cuelga ni explota con un salón de 50 mesas pegadas', () => {

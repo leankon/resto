@@ -2,6 +2,14 @@
 
 import { useActionState } from 'react';
 import type { MesaDelPlano } from '../../../servicios/plano';
+import type { FormaMesa } from '../../../dominio/tipos';
+
+const FORMAS: [FormaMesa, string][] = [
+  ['rect', 'Rectangular'],
+  ['cuadrada', 'Cuadrada'],
+  ['redonda', 'Redonda'],
+  ['barra', 'Barra o banco'],
+];
 import {
   agregarMesa, agregarSalon, alternarActiva, eliminarMesa, eliminarSalon, guardarMesa,
 } from './acciones';
@@ -26,11 +34,20 @@ export function AgregarSalon() {
   );
 }
 
-export function AgregarMesa({ salonId }: { salonId: string }) {
+export function AgregarMesa({
+  salonId, anchoCm, altoCm,
+}: {
+  salonId: string;
+  anchoCm: number;
+  altoCm: number;
+}) {
   const [error, enviar, enviando] = useActionState(agregarMesa, null);
   return (
     <form action={enviar} style={{ marginTop: 16 }} key={error ?? 'limpio'}>
       <input type="hidden" name="salonId" value={salonId} />
+      {/* En el centro del salón: en una esquina quedaría medio afuera del dibujo. */}
+      <input type="hidden" name="x" value={Math.round(anchoCm / 2)} />
+      <input type="hidden" name="y" value={Math.round(altoCm / 2)} />
       {error && <p className="aviso">{error}</p>}
       <div className="fila">
         <label style={{ flex: '1 1 120px' }}>
@@ -49,6 +66,14 @@ export function AgregarMesa({ salonId }: { salonId: string }) {
           Mínimo
           <input name="capacidadMin" type="number" min={1} defaultValue={1} />
         </label>
+        <label style={{ flex: '0 1 140px' }}>
+          Forma
+          <select name="forma" defaultValue="rect">
+            {FORMAS.map(([valor, texto]) => (
+              <option key={valor} value={valor}>{texto}</option>
+            ))}
+          </select>
+        </label>
         <label style={{ flex: '0 0 auto', display: 'flex', gap: 6, alignItems: 'center' }}>
           <input type="checkbox" name="combinable" defaultChecked
                  style={{ width: 'auto', margin: 0 }} />
@@ -61,9 +86,11 @@ export function AgregarMesa({ salonId }: { salonId: string }) {
       <p className="apagado" style={{ marginTop: -4 }}>
         Las cabeceras son las sillas que se pueden sumar en las puntas: una mesa de 4 con
         dos cabeceras sienta 6. El mínimo evita que una pareja termine en la mesa de 10.
-        Destildá "se puede mover y unir" para lo que está fijo al piso o a la pared: una
-        barra, un banco corrido. La mesa aparece arriba a la izquierda; después la arrastrás
-        a su lugar.
+        Una mesa redonda no tiene puntas, así que no lleva cabeceras. Y al unir dos mesas
+        quedan solo las dos puntas del conjunto: dos mesas con dos cabeceras cada una no
+        suman cuatro lugares de punta, suman dos. Destildá "se puede mover y unir" para lo
+        que está fijo al piso o a la pared. La mesa aparece en el centro del salón; después
+        la arrastrás a su lugar.
       </p>
     </form>
   );
@@ -83,7 +110,7 @@ export function TablaMesas({ mesas }: { mesas: MesaDelPlano[] }) {
         <thead>
           <tr>
             <th>Nombre</th><th>Sillas</th><th>Cabeceras</th><th>Mínimo</th>
-            <th>Posición</th><th>Se une</th><th /><th />
+            <th>Forma</th><th>Posición</th><th>Se une</th><th /><th />
           </tr>
         </thead>
         <tbody>
@@ -104,6 +131,13 @@ export function TablaMesas({ mesas }: { mesas: MesaDelPlano[] }) {
               <td>
                 <input form={`m-${m.id}`} className="angosto" type="number" name="capacidadMin"
                        min={1} defaultValue={m.capacidadMin} />
+              </td>
+              <td>
+                <select form={`m-${m.id}`} name="forma" defaultValue={m.forma}>
+                  {FORMAS.map(([valor, texto]) => (
+                    <option key={valor} value={valor}>{texto}</option>
+                  ))}
+                </select>
               </td>
               <td className="apagado" style={{ whiteSpace: 'nowrap' }}>{m.x} × {m.y} cm</td>
               <td>

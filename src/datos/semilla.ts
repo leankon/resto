@@ -8,11 +8,15 @@ export interface MesaNueva {
   capacidadMin?: number;
   x: number;
   y: number;
+  forma?: 'rect' | 'cuadrada' | 'redonda' | 'barra';
   combinable?: boolean;
 }
 
 export interface SalonNuevo {
   nombre: string;
+  /** Medidas reales, en centímetros. El plano se dibuja exactamente de este tamaño. */
+  anchoCm?: number;
+  altoCm?: number;
   mesas: MesaNueva[];
 }
 
@@ -85,8 +89,9 @@ export async function crearLocal(admin: pg.Pool, datos: LocalNuevo): Promise<Loc
     const mesas: Record<string, string> = {};
     for (const [orden, salon] of datos.salones.entries()) {
       const { rows } = await c.query(
-        `INSERT INTO salones (tenant_id, nombre, orden) VALUES ($1, $2, $3) RETURNING id`,
-        [tenantId, salon.nombre, orden],
+        `INSERT INTO salones (tenant_id, nombre, orden, ancho_cm, alto_cm)
+         VALUES ($1, $2, $3, $4, $5) RETURNING id`,
+        [tenantId, salon.nombre, orden, salon.anchoCm ?? 1200, salon.altoCm ?? 800],
       );
       const salonId = rows[0].id as string;
       salones[salon.nombre] = salonId;
@@ -94,8 +99,8 @@ export async function crearLocal(admin: pg.Pool, datos: LocalNuevo): Promise<Loc
       for (const mesa of salon.mesas) {
         const creada = await c.query(
           `INSERT INTO mesas (tenant_id, salon_id, nombre, capacidad_base, cabeceras,
-                              capacidad_min, x, y, combinable)
-           VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9) RETURNING id`,
+                              capacidad_min, x, y, forma, combinable)
+           VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10) RETURNING id`,
           [
             tenantId,
             salonId,
@@ -105,6 +110,7 @@ export async function crearLocal(admin: pg.Pool, datos: LocalNuevo): Promise<Loc
             mesa.capacidadMin ?? 1,
             mesa.x,
             mesa.y,
+            mesa.forma ?? 'rect',
             mesa.combinable ?? true,
           ],
         );
@@ -133,14 +139,16 @@ export async function crearLocal(admin: pg.Pool, datos: LocalNuevo): Promise<Loc
 export const SALON_DEMO: SalonNuevo[] = [
   {
     nombre: 'Planta baja',
+    anchoCm: 1800,
+    altoCm: 900,
     mesas: [
       // Fila contra la ventana: se pueden ir uniendo de a una.
-      { nombre: '1', capacidadBase: 2, x: 100, y: 120 },
-      { nombre: '2', capacidadBase: 2, x: 300, y: 120 },
-      { nombre: '3', capacidadBase: 2, x: 520, y: 120 },
+      { nombre: '1', capacidadBase: 2, forma: 'cuadrada', x: 100, y: 120 },
+      { nombre: '2', capacidadBase: 2, forma: 'cuadrada', x: 300, y: 120 },
+      { nombre: '3', capacidadBase: 2, forma: 'cuadrada', x: 520, y: 120 },
       // Mesa rectangular con sillas de punta.
       { nombre: '4', capacidadBase: 4, cabeceras: 2, x: 1100, y: 150 },
-      { nombre: '5', capacidadBase: 6, x: 1100, y: 520 },
+      { nombre: '5', capacidadBase: 6, forma: 'redonda', x: 1100, y: 520 },
       // Par del otro lado del salón.
       { nombre: '6', capacidadBase: 3, x: 400, y: 520 },
       { nombre: '7', capacidadBase: 3, x: 600, y: 520 },
@@ -150,6 +158,8 @@ export const SALON_DEMO: SalonNuevo[] = [
   },
   {
     nombre: 'Terraza',
+    anchoCm: 700,
+    altoCm: 500,
     mesas: [
       { nombre: 'T1', capacidadBase: 4, x: 150, y: 150 },
       { nombre: 'T2', capacidadBase: 4, x: 380, y: 150 },

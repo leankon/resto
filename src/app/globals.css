@@ -120,13 +120,12 @@ tr.pasada td { color: var(--suave); }
 
 /* --- Plano del salón --- */
 .lienzo {
-  position: relative; width: 100%; max-width: 900px;
+  position: relative; max-width: 100%;
   border: 1px solid var(--borde); border-radius: var(--radio);
   background:
     linear-gradient(var(--borde) 1px, transparent 1px) 0 0 / 100% 40px,
     linear-gradient(90deg, var(--borde) 1px, transparent 1px) 0 0 / 40px 100%,
     #fff;
-  background-blend-mode: normal;
   overflow: hidden; touch-action: none; margin-bottom: 10px;
 }
 .lienzo .uniones { position: absolute; inset: 0; pointer-events: none; }
@@ -134,16 +133,29 @@ tr.pasada td { color: var(--suave); }
 
 .ficha {
   position: absolute; transform: translate(-50%, -50%);
-  display: flex; flex-direction: column; align-items: center; justify-content: center;
-  gap: 1px; padding: 0; cursor: grab;
+  display: flex; align-items: center; justify-content: center;
+  padding: 0; cursor: grab; overflow: hidden;
   background: var(--acento-suave); color: var(--acento);
-  border: 1.5px solid var(--acento); font: inherit; line-height: 1.1;
+  border: 1.5px solid var(--acento); border-radius: 5px; font: inherit; line-height: 1;
 }
-.ficha span { font-weight: 650; font-size: 13px; }
-.ficha small { font-size: 10px; opacity: .75; }
-.ficha.inactiva { background: #f0eeea; color: var(--suave); border-color: var(--borde); }
+.ficha span { font-weight: 650; font-size: 12px; }
+.ficha.forma-redonda { border-radius: 50%; }
+.ficha.forma-cuadrada { border-radius: 5px; }
+.ficha.forma-barra { border-radius: 3px; }
+.ficha.fija { border-style: dashed; background: #f4f2ee; color: var(--suave); border-color: var(--suave); }
+.ficha.inactiva { background: #f0eeea; color: var(--suave); border-color: var(--borde); opacity: .6; }
 .ficha.moviendo { cursor: grabbing; box-shadow: 0 4px 14px rgb(0 0 0 / .18); z-index: 5; }
 
-.editor-mesas input[type="text"], .editor-mesas input[type="number"] { padding: 5px 7px; }
+.tirador {
+  position: absolute; right: 0; bottom: 0; width: 22px; height: 22px;
+  padding: 0; cursor: nwse-resize; z-index: 6;
+  background:
+    linear-gradient(135deg, transparent 50%, var(--acento) 50%);
+  border: none; border-radius: 0 0 var(--radio) 0; opacity: .5;
+}
+.tirador:hover { opacity: 1; }
+
+.editor-mesas input[type="text"], .editor-mesas input[type="number"],
+.editor-mesas select { padding: 5px 7px; }
 .editor-mesas td { padding: 6px; }
 .editor-mesas .angosto { width: 66px; }

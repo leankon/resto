@@ -3,8 +3,9 @@ import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 import { URL_ADMIN, pool } from '../datos/conexion';
 import { crearLocal, type LocalCreado } from '../datos/semilla';
 import {
-  borrarMesa, borrarSalon, cambiarActivaMesa, cambiarRadioCombinacion, cargarPlanoCompleto,
-  crearMesa, crearSalon, moverMesa, quitarVeto, vetarCombinacion, actualizarMesa,
+  actualizarMesa, borrarMesa, borrarSalon, cambiarActivaMesa, cambiarMedidasSalon,
+  cambiarRadioCombinacion, cargarPlanoCompleto, crearMesa, crearSalon, moverMesa,
+  quitarVeto, vetarCombinacion,
 } from './plano';
 import { crearReserva } from './reservas';
 
@@ -14,7 +15,8 @@ let local: LocalCreado;
 let salonId: string;
 
 const mesa = (nombre: string, x: number, extra = {}) => ({
-  nombre, capacidadBase: 2, cabeceras: 0, capacidadMin: 1, x, y: 0, combinable: true, ...extra,
+  nombre, capacidadBase: 2, cabeceras: 0, capacidadMin: 1, x, y: 0,
+  forma: 'rect' as const, combinable: true, ...extra,
 });
 
 beforeAll(async () => {
@@ -94,7 +96,7 @@ describe('las combinaciones que el sistema deduce', () => {
     const plano = await cargarPlanoCompleto(app, local.tenantId);
     expect(plano.combinaciones.map((c) => c.etiqueta)).toEqual(['1+2']);
     expect(plano.combinaciones[0]).toMatchObject({
-      capacidad: '4', distanciaCm: 200, salon: 'Planta baja',
+      capacidad: '4', distanciaCm: 130, salon: 'Planta baja',
     });
   });
 
@@ -193,5 +195,122 @@ describe('editar una mesa', () => {
       .toMatchObject({ capacidadBase: 4, cabeceras: 2 });
     // 4 + 2 sillas, más las dos cabeceras del conjunto.
     expect(plano.combinaciones[0]!.capacidad).toBe('6–8');
+  });
+});
+
+describe('forma de la mesa', () => {
+  it('guarda la forma y la devuelve', async () => {
+    await crearMesa(app, local.tenantId, salonId, mesa('R', 0, { forma: 'redonda' }));
+    await crearMesa(app, local.tenantId, salonId, mesa('C', 400, { forma: 'cuadrada' }));
+    const plano = await cargarPlanoCompleto(app, local.tenantId);
+    expect(plano.salones[0]!.mesas.map((m) => [m.nombre, m.forma])).toEqual([
+      ['C', 'cuadrada'], ['R', 'redonda'],
+    ]);
+  });
+
+  it('una mesa redonda no puede tener cabeceras', async () => {
+    // No es un capricho: una mesa redonda no tiene puntas donde sumar una silla.
+    const r = await crearMesa(app, local.tenantId, salonId,
+      mesa('R', 0, { forma: 'redonda', cabeceras: 2 }));
+    expect(r.tipo).toBe('datos_invalidos');
+    if (r.tipo === 'datos_invalidos') expect(r.motivo).toMatch(/redonda/i);
+  });
+});
+
+describe('cabeceras al unir mesas', () => {
+  it('dos mesas con dos cabeceras cada una no suman cuatro, suman dos', async () => {
+    // Las cabeceras del medio quedan contra la otra mesa: dejan de ser lugares.
+    await crearMesa(app, local.tenantId, salonId,
+      mesa('A', 0, { capacidadBase: 4, cabeceras: 2 }));
+    await crearMesa(app, local.tenantId, salonId,
+      mesa('B', 200, { capacidadBase: 4, cabeceras: 2 }));
+
+    const plano = await cargarPlanoCompleto(app, local.tenantId);
+    // 4 + 4 sillas, y solo dos cabeceras para todo el conjunto: 8 a 10, no 8 a 12.
+    expect(plano.combinaciones[0]).toMatchObject({ etiqueta: 'A+B', capacidad: '8–10' });
+  });
+});
+
+describe('medidas del salón', () => {
+  it('agrandar y achicar, dentro de límites razonables', async () => {
+    expect(await cambiarMedidasSalon(app, local.tenantId, salonId, 2000, 1500))
+      .toEqual({ anchoCm: 2000, altoCm: 1500 });
+
+    const plano = await cargarPlanoCompleto(app, local.tenantId);
+    expect(plano.salones[0]).toMatchObject({ anchoCm: 2000, altoCm: 1500 });
+
+    expect(await cambiarMedidasSalon(app, local.tenantId, salonId, 999999, 1))
+      .toEqual({ anchoCm: 10000, altoCm: 200 });
+  });
+
+  it('al achicar el salón, las mesas que quedaban afuera se traen adentro', async () => {
+    // Una mesa fuera del dibujo no se puede arrastrar de vuelta porque no se ve.
+    await cambiarMedidasSalon(app, local.tenantId, salonId, 3000, 2000);
+    await crearMesa(app, local.tenantId, salonId, { ...mesa('Lejos', 2800), y: 1900 });
+
+    await cambiarMedidasSalon(app, local.tenantId, salonId, 1000, 600);
+    const plano = await cargarPlanoCompleto(app, local.tenantId);
+    expect(plano.salones[0]!.mesas[0]).toMatchObject({ x: 1000, y: 600 });
+  });
+
+  it('una mesa no se puede mover fuera del salón', async () => {
+    await cambiarMedidasSalon(app, local.tenantId, salonId, 1000, 600);
+    const creada = await crearMesa(app, local.tenantId, salonId, mesa('1', 100));
+    if (creada.tipo !== 'ok') throw new Error('no se creó');
+
+    await moverMesa(app, local.tenantId, creada.id, 99999, -500);
+    const plano = await cargarPlanoCompleto(app, local.tenantId);
+    expect(plano.salones[0]!.mesas[0]).toMatchObject({ x: 1000, y: 0 });
+  });
+});
+
+describe('por qué dos mesas no se unen', () => {
+  it('explica que están lejos, con la distancia real entre bordes', async () => {
+    await crearMesa(app, local.tenantId, salonId, mesa('1', 0));
+    await crearMesa(app, local.tenantId, salonId, mesa('2', 400));
+
+    const plano = await cargarPlanoCompleto(app, local.tenantId);
+    expect(plano.combinaciones).toHaveLength(0);
+    expect(plano.noSeUnen[0]).toMatchObject({ etiqueta: '1 + 2', separacionCm: 330 });
+    expect(plano.noSeUnen[0]!.motivo).toMatch(/3\.30 m.*2\.50 m/);
+  });
+
+  it('explica que una está marcada como fija', async () => {
+    await crearMesa(app, local.tenantId, salonId, mesa('1', 0));
+    await crearMesa(app, local.tenantId, salonId, mesa('Barra', 200, { combinable: false }));
+
+    const plano = await cargarPlanoCompleto(app, local.tenantId);
+    expect(plano.noSeUnen[0]).toMatchObject({ etiqueta: '1 + Barra' });
+    expect(plano.noSeUnen[0]!.motivo).toMatch(/Barra está marcada como fija/);
+  });
+
+  it('explica que el par fue marcado como imposible', async () => {
+    const a = await crearMesa(app, local.tenantId, salonId, mesa('1', 0));
+    const b = await crearMesa(app, local.tenantId, salonId, mesa('2', 200));
+    if (a.tipo !== 'ok' || b.tipo !== 'ok') throw new Error('no se creó');
+
+    await vetarCombinacion(app, local.tenantId, a.id, b.id);
+    const plano = await cargarPlanoCompleto(app, local.tenantId);
+    expect(plano.noSeUnen[0]!.motivo).toMatch(/imposibles de unir/);
+  });
+
+  it('no dice nada de las que sí se unen', async () => {
+    await crearMesa(app, local.tenantId, salonId, mesa('1', 0));
+    await crearMesa(app, local.tenantId, salonId, mesa('2', 200));
+    const plano = await cargarPlanoCompleto(app, local.tenantId);
+    expect(plano.combinaciones).toHaveLength(1);
+    expect(plano.noSeUnen).toHaveLength(0);
+  });
+
+  it('dos mesas de ocho pegadas se unen, y no aparecen como problema', async () => {
+    // El caso que motivó medir entre bordes: de centro a centro quedaban a 3 m.
+    await crearMesa(app, local.tenantId, salonId,
+      mesa('G1', 0, { capacidadBase: 8, capacidadMin: 1 }));
+    await crearMesa(app, local.tenantId, salonId,
+      mesa('G2', 300, { capacidadBase: 8, capacidadMin: 1 }));
+
+    const plano = await cargarPlanoCompleto(app, local.tenantId);
+    expect(plano.combinaciones.map((c) => c.etiqueta)).toEqual(['G1+G2']);
+    expect(plano.noSeUnen).toHaveLength(0);
   });
 });

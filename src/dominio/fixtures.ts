@@ -27,6 +27,7 @@ function mesa(
     capacidadMin: 1,
     x,
     y: 0,
+    forma: 'rect',
     combinable: true,
     activa: true,
     ...opciones,

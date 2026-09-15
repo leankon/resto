@@ -1,3 +1,4 @@
+import { separacionCm } from './mesas';
 import type { Centimetros, ConfigAsignacion, Id, Mesa } from './tipos';
 
 /**
@@ -27,14 +28,18 @@ export interface Candidato {
   capacidadMax: number;
   /** Debajo de esto el candidato no se ofrece, aunque entre. */
   capacidadMin: number;
-  /** Cuánto hay que arrimar las mesas en total, en cm (árbol generador mínimo). */
+  /**
+   * Cuánto hay que arrimar las mesas en total para que queden pegadas, en cm. Es el peso
+   * del árbol generador mínimo: el recorrido más corto que las une a todas.
+   */
   distanciaCm: Centimetros;
 }
 
 export type ParVetado = readonly [Id, Id];
 
+/** Cuánto hay que arrimarlas para que se toquen. Ver `separacionCm`. */
 function distancia(a: Mesa, b: Mesa): Centimetros {
-  return Math.hypot(a.x - b.x, a.y - b.y);
+  return separacionCm(a, b);
 }
 
 function claveDePar(a: Id, b: Id): string {
@@ -94,7 +99,9 @@ function armarCandidato(mesas: Mesa[], config: ConfigAsignacion): Candidato {
   }
 
   const capacidadNominal = base - config.perdidaPorUnion * (ordenadas.length - 1);
-  // Al unir mesas solo quedan las dos puntas del conjunto.
+  // Al unir mesas solo quedan las dos puntas del CONJUNTO, no las de cada mesa: dos
+  // mesas de cuatro con dos cabeceras cada una no sientan cuatro de punta, sientan dos.
+  // Las del medio quedan contra la otra mesa.
   const cabecerasDisponibles = Math.min(2, cabeceras);
   // Un combo solo se ofrece si el grupo no entraba en ninguna de sus mesas por separado:
   // no tiene sentido proponer 3+4 para un grupo de 3.

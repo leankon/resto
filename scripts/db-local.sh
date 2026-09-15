@@ -29,10 +29,26 @@ start() {
   echo "Postgres en localhost:$PORT, base '$DB'"
 }
 
+# Lleva registro de qué migraciones ya corrieron. Sin esto, arrancar la base una
+# segunda vez intenta recrear las tablas y falla, que es ruido sin información.
 migrar() {
+  psql -h localhost -p "$PORT" -U postgres -d "$DB" -q -c "
+    CREATE TABLE IF NOT EXISTS migraciones_aplicadas (
+      archivo text PRIMARY KEY,
+      aplicada_en timestamptz NOT NULL DEFAULT now())"
+
   for archivo in "$RAIZ"/src/datos/migraciones/*.sql; do
-    echo "  aplicando $(basename "$archivo")"
+    nombre="$(basename "$archivo")"
+    yaEsta="$(psql -h localhost -p "$PORT" -U postgres -d "$DB" -tAc \
+      "SELECT 1 FROM migraciones_aplicadas WHERE archivo = '$nombre'")"
+    if [ "$yaEsta" = "1" ]; then
+      echo "  ya aplicada: $nombre"
+      continue
+    fi
+    echo "  aplicando $nombre"
     psql -h localhost -p "$PORT" -U postgres -d "$DB" -v ON_ERROR_STOP=1 -q -f "$archivo"
+    psql -h localhost -p "$PORT" -U postgres -d "$DB" -q -c \
+      "INSERT INTO migraciones_aplicadas (archivo) VALUES ('$nombre')"
   done
 }
 

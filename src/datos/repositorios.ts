@@ -33,7 +33,7 @@ export async function cargarTenant(c: pg.PoolClient, tenantId: string): Promise<
 export async function cargarPlano(c: pg.PoolClient, tenantId: string): Promise<Mesa[]> {
   const { rows } = await c.query(
     `SELECT m.id, m.salon_id, m.nombre, m.capacidad_base, m.cabeceras,
-            m.capacidad_min, m.x, m.y, m.combinable, m.activa
+            m.capacidad_min, m.x, m.y, m.forma, m.combinable, m.activa
        FROM mesas m JOIN salones s ON s.id = m.salon_id
       WHERE m.tenant_id = $1 AND s.activo
       ORDER BY s.orden, m.nombre`,
@@ -48,6 +48,7 @@ export async function cargarPlano(c: pg.PoolClient, tenantId: string): Promise<M
     capacidadMin: f.capacidad_min,
     x: f.x,
     y: f.y,
+    forma: f.forma,
     combinable: f.combinable,
     activa: f.activa,
   }));

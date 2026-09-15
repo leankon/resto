@@ -1,7 +1,10 @@
 import type pg from 'pg';
 import { conTenant } from '../datos/conexion';
 import { compararNatural, derivarCandidatos, type Candidato } from '../dominio/combinaciones';
-import { CONFIG_POR_DEFECTO, type ConfigAsignacion, type Mesa } from '../dominio/tipos';
+import { separacionCm } from '../dominio/mesas';
+import {
+  CONFIG_POR_DEFECTO, type ConfigAsignacion, type FormaMesa, type Mesa,
+} from '../dominio/tipos';
 import {
   cargarConfigAsignacion,
   cargarPlano,
@@ -18,6 +21,9 @@ export interface SalonDelPlano {
   id: string;
   nombre: string;
   orden: number;
+  /** Medidas reales del salón, en centímetros. El plano dibuja exactamente esto. */
+  anchoCm: number;
+  altoCm: number;
   mesas: MesaDelPlano[];
 }
 
@@ -26,7 +32,16 @@ export interface PlanoCompleto {
   config: ConfigAsignacion;
   /** Lo que el motor va a poder armar con este plano. */
   combinaciones: CombinacionPosible[];
+  /** Pares que están cerca pero no se van a unir, y por qué. */
+  noSeUnen: ParQueNoSeUne[];
   vetadas: { mesaA: string; mesaB: string; nombreA: string; nombreB: string }[];
+}
+
+export interface ParQueNoSeUne {
+  etiqueta: string;
+  salonId: string;
+  motivo: string;
+  separacionCm: number;
 }
 
 export interface CombinacionPosible {
@@ -50,14 +65,15 @@ export async function cargarPlanoCompleto(
   tenantId: string,
 ): Promise<PlanoCompleto> {
   return conTenant(pool, tenantId, async (c) => {
-    const [config, mesas, vetados] = await Promise.all([
-      cargarConfigAsignacion(c, tenantId),
-      cargarPlano(c, tenantId),
-      cargarVetados(c, tenantId),
-    ]);
+    // Una a una y no en paralelo: comparten la misma conexión, y una conexión de
+    // Postgres no puede ejecutar dos consultas a la vez. `pg` hoy las encola y avisa
+    // que va a dejar de hacerlo.
+    const config = await cargarConfigAsignacion(c, tenantId);
+    const mesas = await cargarPlano(c, tenantId);
+    const vetados = await cargarVetados(c, tenantId);
 
     const salones = await c.query(
-      `SELECT id, nombre, orden FROM salones
+      `SELECT id, nombre, orden, ancho_cm, alto_cm FROM salones
         WHERE tenant_id = $1 AND activo ORDER BY orden, nombre`,
       [tenantId],
     );
@@ -73,16 +89,55 @@ export async function cargarPlanoCompleto(
     const candidatos = derivarCandidatos(mesas, config, vetados);
     const porSalon = new Map(salones.rows.map((s) => [s.id, s.nombre as string]));
 
+    // Por qué NO se unen dos mesas que parecen estar al lado. Sin esto, la única
+    // respuesta posible a "por qué no me las junta" es probar y adivinar.
+    const vetadoEntre = new Set(vetados.map(([a, b]) => [a, b].sort().join('|')));
+    const noSeUnen: ParQueNoSeUne[] = [];
+    for (let i = 0; i < mesas.length; i++) {
+      for (let j = i + 1; j < mesas.length; j++) {
+        const a = mesas[i]!;
+        const b = mesas[j]!;
+        if (a.salonId !== b.salonId) continue;
+        const separacion = Math.round(separacionCm(a, b));
+        // Solo las que están razonablemente cerca: el resto no sorprende a nadie.
+        if (separacion > config.radioCombinacionCm * 2.5) continue;
+
+        const etiqueta = [a.nombre, b.nombre].sort(compararNatural).join(' + ');
+        const comun = { etiqueta, salonId: a.salonId, separacionCm: separacion };
+
+        if (vetadoEntre.has([a.id, b.id].sort().join('|'))) {
+          noSeUnen.push({ ...comun, motivo: 'las marcaste como imposibles de unir' });
+        } else if (!a.combinable || !b.combinable) {
+          const fijas = [a, b].filter((m) => !m.combinable).map((m) => m.nombre);
+          noSeUnen.push({
+            ...comun,
+            motivo: `${fijas.join(' y ')} ${fijas.length > 1 ? 'están marcadas' : 'está marcada'} como fija`,
+          });
+        } else if (!a.activa || !b.activa) {
+          const bajas = [a, b].filter((m) => !m.activa).map((m) => m.nombre);
+          noSeUnen.push({ ...comun, motivo: `${bajas.join(' y ')} está desactivada` });
+        } else if (separacion > config.radioCombinacionCm) {
+          noSeUnen.push({
+            ...comun,
+            motivo: `están a ${(separacion / 100).toFixed(2)} m y el límite es ${(config.radioCombinacionCm / 100).toFixed(2)} m`,
+          });
+        }
+      }
+    }
+
     return {
       config,
       salones: salones.rows.map((s) => ({
         id: s.id,
         nombre: s.nombre,
         orden: s.orden,
+        anchoCm: s.ancho_cm,
+        altoCm: s.alto_cm,
         mesas: mesas
           .filter((m) => m.salonId === s.id)
           .map((m) => ({ ...m, reservas: reservasPorMesa.get(m.id) ?? 0 })),
       })),
+      noSeUnen: noSeUnen.sort((a, b) => a.separacionCm - b.separacionCm).slice(0, 12),
       combinaciones: candidatos
         .filter((c) => c.mesas.length > 1)
         .sort((a, b) => a.etiqueta.localeCompare(b.etiqueta, 'es', { numeric: true }))
@@ -166,6 +221,7 @@ export interface DatosMesa {
   capacidadMin: number;
   x: number;
   y: number;
+  forma: FormaMesa;
   combinable: boolean;
 }
 
@@ -181,6 +237,9 @@ function validar(datos: DatosMesa): string | null {
   }
   if (datos.cabeceras < 0 || datos.cabeceras > 2) {
     return 'Las cabeceras son como máximo dos: una en cada punta.';
+  }
+  if (datos.forma === 'redonda' && datos.cabeceras > 0) {
+    return 'Una mesa redonda no tiene puntas, así que no lleva cabeceras.';
   }
   if (datos.capacidadMin < 1 || datos.capacidadMin > datos.capacidadBase + datos.cabeceras) {
     return 'El mínimo no puede ser mayor que la capacidad de la mesa.';
@@ -201,11 +260,12 @@ export async function crearMesa(
     return await conTenant(pool, tenantId, async (c) => {
       const { rows } = await c.query(
         `INSERT INTO mesas (tenant_id, salon_id, nombre, capacidad_base, cabeceras,
-                            capacidad_min, x, y, combinable)
-         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9) RETURNING id`,
+                            capacidad_min, x, y, forma, combinable)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10) RETURNING id`,
         [
           tenantId, salonId, datos.nombre.trim(), datos.capacidadBase, datos.cabeceras,
-          datos.capacidadMin, Math.round(datos.x), Math.round(datos.y), datos.combinable,
+          datos.capacidadMin, Math.round(datos.x), Math.round(datos.y), datos.forma,
+          datos.combinable,
         ],
       );
       return { tipo: 'ok' as const, id: rows[0].id as string };
@@ -229,11 +289,12 @@ export async function actualizarMesa(
     return await conTenant(pool, tenantId, async (c) => {
       await c.query(
         `UPDATE mesas SET nombre = $2, capacidad_base = $3, cabeceras = $4,
-                          capacidad_min = $5, x = $6, y = $7, combinable = $8
+                          capacidad_min = $5, x = $6, y = $7, forma = $8, combinable = $9
           WHERE id = $1`,
         [
           mesaId, datos.nombre.trim(), datos.capacidadBase, datos.cabeceras,
-          datos.capacidadMin, Math.round(datos.x), Math.round(datos.y), datos.combinable,
+          datos.capacidadMin, Math.round(datos.x), Math.round(datos.y), datos.forma,
+          datos.combinable,
         ],
       );
       return { tipo: 'ok' as const, id: mesaId };
@@ -244,7 +305,12 @@ export async function actualizarMesa(
   }
 }
 
-/** Solo la posición: es lo que cambia al arrastrar una mesa en el plano. */
+/**
+ * Solo la posición: es lo que cambia al arrastrar una mesa en el plano.
+ *
+ * Se recorta contra las medidas del salón, así que una mesa nunca queda fuera del
+ * dibujo ni en coordenadas negativas.
+ */
 export async function moverMesa(
   pool: pg.Pool,
   tenantId: string,
@@ -253,10 +319,43 @@ export async function moverMesa(
   y: number,
 ): Promise<void> {
   await conTenant(pool, tenantId, (c) =>
-    c.query(`UPDATE mesas SET x = $2, y = $3 WHERE id = $1`, [
-      mesaId, Math.max(0, Math.round(x)), Math.max(0, Math.round(y)),
-    ]),
+    c.query(
+      `UPDATE mesas m SET
+         x = greatest(0, least($2::int, s.ancho_cm)),
+         y = greatest(0, least($3::int, s.alto_cm))
+       FROM salones s WHERE s.id = m.salon_id AND m.id = $1`,
+      [mesaId, Math.round(x), Math.round(y)],
+    ),
   );
+}
+
+/**
+ * Agranda o achica el salón.
+ *
+ * Las mesas que quedaran fuera del nuevo rectángulo se traen adentro: una mesa con una
+ * posición imposible no se puede arrastrar de vuelta porque no se ve.
+ */
+export async function cambiarMedidasSalon(
+  pool: pg.Pool,
+  tenantId: string,
+  salonId: string,
+  anchoCm: number,
+  altoCm: number,
+): Promise<{ anchoCm: number; altoCm: number }> {
+  const limitar = (v: number) => Math.min(10000, Math.max(200, Math.round(v)));
+  const ancho = limitar(anchoCm);
+  const alto = limitar(altoCm);
+
+  await conTenant(pool, tenantId, async (c) => {
+    await c.query(`UPDATE salones SET ancho_cm = $2, alto_cm = $3 WHERE id = $1`,
+      [salonId, ancho, alto]);
+    await c.query(
+      `UPDATE mesas SET x = least(x, $2), y = least(y, $3)
+        WHERE salon_id = $1 AND (x > $2 OR y > $3)`,
+      [salonId, ancho, alto],
+    );
+  });
+  return { anchoCm: ancho, altoCm: alto };
 }
 
 /**

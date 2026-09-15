@@ -12,6 +12,12 @@ export type Centimetros = number;
 /** 0 = domingo, 6 = sábado (igual que `Date.getDay`). */
 export type DiaSemana = 0 | 1 | 2 | 3 | 4 | 5 | 6;
 
+/**
+ * Forma de la mesa. Solo importa para dibujarla y para una regla: una mesa redonda no
+ * tiene puntas, así que no se le pueden agregar cabeceras.
+ */
+export type FormaMesa = 'rect' | 'cuadrada' | 'redonda' | 'barra';
+
 export interface Salon {
   id: Id;
   nombre: string;
@@ -32,6 +38,7 @@ export interface Mesa {
   /** Centro de la mesa sobre el plano del salón. */
   x: Centimetros;
   y: Centimetros;
+  forma: FormaMesa;
   /** `false` para lo que no se mueve: barra, mesas empotradas, bancos de pared. */
   combinable: boolean;
   activa: boolean;

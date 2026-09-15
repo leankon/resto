@@ -3,7 +3,7 @@ import { poolApp, requerirEncargado } from '../../../web/contexto';
 import { cargarPlanoCompleto } from '../../../servicios/plano';
 import Lienzo from './lienzo';
 import { AgregarMesa, AgregarSalon, BorrarSalon, TablaMesas } from './formularios';
-import { cambiarRadio, desvetar, vetar } from './acciones';
+import { cambiarRadio, desvetar, medidasDesdeFormulario, vetar } from './acciones';
 
 export default async function Salon({
   searchParams,
@@ -18,6 +18,9 @@ export default async function Salon({
 
   const deEsteSalon = activo
     ? plano.combinaciones.filter((c) => c.mesas.every((id) => activo.mesas.some((m) => m.id === id)))
+    : [];
+  const noSeUnenAca = activo
+    ? plano.noSeUnen.filter((p) => p.salonId === activo.id)
     : [];
 
   return (
@@ -50,7 +53,31 @@ export default async function Salon({
           <>
             <section className="tarjeta">
               <h2>{activo.nombre}</h2>
-              <Lienzo mesas={activo.mesas} radioCm={radio} vetadas={plano.vetadas} />
+              <Lienzo
+                salonId={activo.id}
+                anchoCm={activo.anchoCm}
+                altoCm={activo.altoCm}
+                mesas={activo.mesas}
+                radioCm={radio}
+                vetadas={plano.vetadas}
+              />
+
+              <form action={medidasDesdeFormulario} className="fila" style={{ marginTop: 12 }}>
+                <input type="hidden" name="salonId" value={activo.id} />
+                <label style={{ flex: '0 1 150px' }}>
+                  Ancho del salón (m)
+                  <input type="number" name="anchoM" min={2} max={100} step={0.5}
+                         defaultValue={activo.anchoCm / 100} />
+                </label>
+                <label style={{ flex: '0 1 150px' }}>
+                  Largo del salón (m)
+                  <input type="number" name="altoM" min={2} max={100} step={0.5}
+                         defaultValue={activo.altoCm / 100} />
+                </label>
+                <div style={{ flex: '0 0 auto' }}>
+                  <button className="secundario" type="submit">Cambiar medidas</button>
+                </div>
+              </form>
 
               <form action={cambiarRadio} className="fila" style={{ marginTop: 14 }}>
                 <label style={{ flex: '1 1 260px' }}>
@@ -71,7 +98,7 @@ export default async function Salon({
             <section className="tarjeta editor-mesas">
               <h2>Mesas de {activo.nombre}</h2>
               <TablaMesas mesas={activo.mesas} />
-              <AgregarMesa salonId={activo.id} />
+              <AgregarMesa salonId={activo.id} anchoCm={activo.anchoCm} altoCm={activo.altoCm} />
             </section>
 
             <section className="tarjeta">
@@ -113,6 +140,29 @@ export default async function Salon({
                 marcala y deja de proponerla.
               </p>
             </section>
+
+            {noSeUnenAca.length > 0 && (
+              <section className="tarjeta">
+                <h2>Por qué estas no se unen</h2>
+                <table>
+                  <tbody>
+                    {noSeUnenAca.map((p) => (
+                      <tr key={p.etiqueta}>
+                        <td style={{ width: 120 }}><strong>{p.etiqueta}</strong></td>
+                        <td>{p.motivo}</td>
+                        <td className="apagado" style={{ whiteSpace: 'nowrap' }}>
+                          {(p.separacionCm / 100).toFixed(2)} m
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+                <p className="apagado">
+                  La distancia se mide entre los bordes, no entre los centros: es cuánto hay
+                  que arrimarlas para que se toquen.
+                </p>
+              </section>
+            )}
           </>
         )}
 
