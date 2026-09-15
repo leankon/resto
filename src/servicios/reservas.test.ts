@@ -332,3 +332,24 @@ describe('carrera entre canales', () => {
     expect(resultados.filter((r) => r.tipo === 'sin_lugar')).toHaveLength(2);
   });
 });
+
+describe('días cerrados', () => {
+  it('un feriado marcado como cerrado rechaza la reserva con su motivo', async () => {
+    await admin.query(
+      `INSERT INTO excepciones_calendario (tenant_id, fecha, cerrado, motivo)
+       VALUES ($1, '2026-10-12', true, 'Feriado')
+       ON CONFLICT (tenant_id, fecha) DO UPDATE SET cerrado = true, motivo = 'Feriado'`,
+      [local.tenantId],
+    );
+
+    const resultado = await crearReserva(app, {
+      tenantId: local.tenantId,
+      inicio: new Date('2026-10-12T21:00:00-03:00'),
+      personas: 2, canalOrigen: 'manual', actor: STAFF,
+      contacto: { nombre: 'Ana', telefono: '1155557777' },
+    });
+    expect(resultado).toEqual({ tipo: 'cerrado_ese_dia', motivo: 'Feriado' });
+
+    await admin.query(`DELETE FROM excepciones_calendario WHERE tenant_id = $1`, [local.tenantId]);
+  });
+});

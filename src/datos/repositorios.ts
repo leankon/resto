@@ -71,6 +71,14 @@ export async function cargarConfigTurnos(
        FROM franjas_servicio WHERE tenant_id = $1 AND activa ORDER BY desde`,
     [tenant.id],
   );
+  // Feriados y días con horario especial. Sin esto el local puede marcar que cierra y
+  // el sistema sigue tomando reservas para ese día.
+  const excepciones = await c.query(
+    `SELECT to_char(fecha, 'YYYY-MM-DD') AS fecha, cerrado, desde, hasta, motivo
+       FROM excepciones_calendario
+      WHERE tenant_id = $1 AND fecha >= current_date - 1`,
+    [tenant.id],
+  );
   const reglas = await c.query(
     `SELECT franja_id, personas_min, personas_max, duracion_min, buffer_min
        FROM duraciones_turno WHERE tenant_id = $1
@@ -102,6 +110,13 @@ export async function cargarConfigTurnos(
         bufferMin: f.buffer_min,
       }),
     ),
+    excepciones: excepciones.rows.map((e) => ({
+      fecha: e.fecha as string,
+      cerrado: e.cerrado as boolean,
+      desde: e.desde ? (e.desde as string).slice(0, 5) : null,
+      hasta: e.hasta ? (e.hasta as string).slice(0, 5) : null,
+      motivo: e.motivo as string | null,
+    })),
     duracionPorDefecto: 120,
     bufferPorDefecto: 15,
   };

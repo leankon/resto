@@ -18,7 +18,8 @@
     "humo": "node scripts/humo.mjs",
     "db:portabilidad": "./scripts/verificar-portabilidad.sh",
     "humo:salon": "node scripts/humo-salon.mjs",
-    "db:migrar": "tsx scripts/migrar.ts"
+    "db:migrar": "tsx scripts/migrar.ts",
+    "humo:horarios": "node scripts/humo-horarios.mjs"
   },
   "devDependencies": {
     "@types/pg": "^8.23.1",

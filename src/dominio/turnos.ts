@@ -1,11 +1,25 @@
 import type { DiaSemana, FranjaServicio, Id, Minutos, ReglaDuracion } from './tipos';
-import { aMinutos, horaLocal } from './tiempo';
+import { aMinutos, fechaLocal, horaLocal } from './tiempo';
+
+/**
+ * Un día que se sale de la rutina: un feriado cerrado, un evento privado, o un día con
+ * horario especial.
+ */
+export interface ExcepcionCalendario {
+  /** YYYY-MM-DD en la zona del local. */
+  fecha: string;
+  cerrado: boolean;
+  desde?: string | null;
+  hasta?: string | null;
+  motivo?: string | null;
+}
 
 export interface ConfigTurnos {
   /** IANA, ej. "America/Argentina/Buenos_Aires". */
   tz: string;
   franjas: FranjaServicio[];
   reglas: ReglaDuracion[];
+  excepciones?: ExcepcionCalendario[];
   /** Último recurso si el local no configuró ninguna regla que aplique. */
   duracionPorDefecto: Minutos;
   bufferPorDefecto: Minutos;
@@ -22,6 +36,7 @@ export type ResultadoTurno =
       origenRegla: 'franja' | 'comodin' | 'defecto';
     }
   | { tipo: 'fuera_de_servicio' }
+  | { tipo: 'cerrado_ese_dia'; motivo: string | null }
   | { tipo: 'despues_del_ultimo_ingreso'; franjaNombre: string; ultimoIngreso: string };
 
 /** Una franja cruza medianoche cuando cierra a una hora menor o igual a la que abre. */
@@ -59,6 +74,26 @@ export function resolverTurno(
 
   const franja = config.franjas.find((f) => aplica(f, dia, minutos));
   if (!franja) return { tipo: 'fuera_de_servicio' };
+
+  // La excepción se busca por el día de SERVICIO, no por el del almanaque: si el local
+  // cierra el 25 y la cena de ese día termina a las 02:00, la reserva de la 01:00 del
+  // 26 pertenece al 25 y también está cerrada.
+  const diaDeServicio =
+    cruzaMedianoche(franja) && minutos < aMinutos(franja.hasta)
+      ? fechaLocal(new Date(inicio.getTime() - 86_400_000), config.tz)
+      : fechaLocal(inicio, config.tz);
+
+  const excepcion = config.excepciones?.find((e) => e.fecha === diaDeServicio);
+  if (excepcion?.cerrado) return { tipo: 'cerrado_ese_dia', motivo: excepcion?.motivo ?? null };
+  if (excepcion?.desde && excepcion?.hasta) {
+    // Horario especial: reemplaza al de la franja solo por ese día.
+    const desde = aMinutos(excepcion.desde);
+    const hasta = aMinutos(excepcion.hasta);
+    const dentro = hasta <= desde
+      ? minutos >= desde || minutos < hasta
+      : minutos >= desde && minutos < hasta;
+    if (!dentro) return { tipo: 'fuera_de_servicio' };
+  }
 
   const ultimo = aMinutos(franja.ultimoIngreso);
   const pasoElUltimoIngreso = cruzaMedianoche(franja)

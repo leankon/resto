@@ -159,3 +159,14 @@ tr.pasada td { color: var(--suave); }
 .editor-mesas select { padding: 5px 7px; }
 .editor-mesas td { padding: 6px; }
 .editor-mesas .angosto { width: 66px; }
+
+.dia { display: inline-flex; margin: 0; cursor: pointer; }
+.dia input { position: absolute; opacity: 0; width: 0; height: 0; }
+.dia span {
+  display: inline-block; min-width: 30px; padding: 4px 2px; text-align: center;
+  border: 1px solid var(--borde); border-radius: 5px; background: #fff;
+  font-size: 12px; color: var(--suave);
+}
+.dia input:checked + span {
+  background: var(--acento); border-color: var(--acento); color: #fff; font-weight: 600;
+}

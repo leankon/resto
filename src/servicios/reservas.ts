@@ -55,6 +55,7 @@ export type ResultadoReserva =
       duracionMin: number;
     }
   | { tipo: 'fuera_de_servicio' }
+  | { tipo: 'cerrado_ese_dia'; motivo: string | null }
   | { tipo: 'despues_del_ultimo_ingreso'; franjaNombre: string; ultimoIngreso: string }
   | { tipo: 'sin_contacto' }
   | { tipo: 'sin_lugar'; alternativas: Alternativa[] };

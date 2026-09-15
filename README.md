@@ -20,7 +20,8 @@ npm run dev          # panel en http://localhost:3000
 npm test             # 107 tests
 npm run test:unit    # solo el motor, sin base de datos
 npm run humo         # recorrido de humo en navegador (requiere el server andando)
-npm run humo:salon   # recorrido de humo sobre la carga del salón
+npm run humo:salon     # recorrido de humo sobre la carga del salón
+npm run humo:horarios  # recorrido de humo sobre horarios y turnos
 ```
 
 Usuarios de prueba que deja `db:demo`:

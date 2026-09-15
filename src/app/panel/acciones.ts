@@ -139,6 +139,13 @@ export async function nuevaReserva(
       };
     case 'fuera_de_servicio':
       return { error: 'A esa hora el local está cerrado.', valores };
+    case 'cerrado_ese_dia':
+      return {
+        error: resultado.motivo
+          ? `Ese día el local está cerrado: ${resultado.motivo}.`
+          : 'Ese día el local está cerrado.',
+        valores,
+      };
     case 'despues_del_ultimo_ingreso':
       return {
         error: `${resultado.franjaNombre}: el último ingreso es a las ${resultado.ultimoIngreso}.`,

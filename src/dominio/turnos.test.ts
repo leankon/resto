@@ -66,3 +66,45 @@ describe('resolverTurno', () => {
     expect(resultado).toMatchObject({ tipo: 'ok', origenRegla: 'defecto', duracionMin: 120 });
   });
 });
+
+describe('excepciones del calendario', () => {
+  it('un día marcado como cerrado no acepta reservas', () => {
+    const resultado = resolverTurno(local('2026-09-15T21:00'), 2, {
+      ...config,
+      excepciones: [{ fecha: '2026-09-15', cerrado: true, motivo: 'Feriado' }],
+    });
+    expect(resultado).toEqual({ tipo: 'cerrado_ese_dia', motivo: 'Feriado' });
+  });
+
+  it('la madrugada pertenece al día de servicio anterior', () => {
+    // Si el local cierra el martes y la cena termina a las 02:00, la reserva de la
+    // 01:00 del miércoles es parte del martes y también está cerrada.
+    const resultado = resolverTurno(local('2026-09-16T00:30'), 2, {
+      ...config,
+      excepciones: [{ fecha: '2026-09-15', cerrado: true, motivo: null }],
+    });
+    expect(resultado).toMatchObject({ tipo: 'cerrado_ese_dia' });
+  });
+
+  it('un horario especial reemplaza al de la franja solo ese día', () => {
+    const conHorarioEspecial = {
+      ...config,
+      excepciones: [
+        { fecha: '2026-09-15', cerrado: false, desde: '20:00', hasta: '22:00' },
+      ],
+    };
+    expect(resolverTurno(local('2026-09-15T21:00'), 2, conHorarioEspecial))
+      .toMatchObject({ tipo: 'ok' });
+    // A las 23 ya cerró, aunque la cena normal siga hasta las 02:00.
+    expect(resolverTurno(local('2026-09-15T23:00'), 2, conHorarioEspecial))
+      .toEqual({ tipo: 'fuera_de_servicio' });
+    // Y al día siguiente vuelve el horario de siempre.
+    expect(resolverTurno(local('2026-09-16T23:00'), 2, conHorarioEspecial))
+      .toMatchObject({ tipo: 'ok' });
+  });
+
+  it('un día sin excepción se comporta como siempre', () => {
+    expect(resolverTurno(local('2026-09-15T21:00'), 2, { ...config, excepciones: [] }))
+      .toMatchObject({ tipo: 'ok' });
+  });
+});
