@@ -117,3 +117,33 @@ tr.pasada td { color: var(--suave); }
 .fila { display: flex; gap: 12px; align-items: flex-end; flex-wrap: wrap; }
 .fila > * { flex: 1; min-width: 140px; }
 .apagado { color: var(--suave); font-size: 13px; }
+
+/* --- Plano del salón --- */
+.lienzo {
+  position: relative; width: 100%; max-width: 900px;
+  border: 1px solid var(--borde); border-radius: var(--radio);
+  background:
+    linear-gradient(var(--borde) 1px, transparent 1px) 0 0 / 100% 40px,
+    linear-gradient(90deg, var(--borde) 1px, transparent 1px) 0 0 / 40px 100%,
+    #fff;
+  background-blend-mode: normal;
+  overflow: hidden; touch-action: none; margin-bottom: 10px;
+}
+.lienzo .uniones { position: absolute; inset: 0; pointer-events: none; }
+.lienzo .uniones line { stroke: var(--acento); stroke-width: 2; stroke-dasharray: 5 4; opacity: .55; }
+
+.ficha {
+  position: absolute; transform: translate(-50%, -50%);
+  display: flex; flex-direction: column; align-items: center; justify-content: center;
+  gap: 1px; padding: 0; cursor: grab;
+  background: var(--acento-suave); color: var(--acento);
+  border: 1.5px solid var(--acento); font: inherit; line-height: 1.1;
+}
+.ficha span { font-weight: 650; font-size: 13px; }
+.ficha small { font-size: 10px; opacity: .75; }
+.ficha.inactiva { background: #f0eeea; color: var(--suave); border-color: var(--borde); }
+.ficha.moviendo { cursor: grabbing; box-shadow: 0 4px 14px rgb(0 0 0 / .18); z-index: 5; }
+
+.editor-mesas input[type="text"], .editor-mesas input[type="number"] { padding: 5px 7px; }
+.editor-mesas td { padding: 6px; }
+.editor-mesas .angosto { width: 66px; }

@@ -36,6 +36,7 @@ export default async function Panel({ searchParams }: { searchParams: Parametros
         <Link className="boton chico" href={`/panel/nueva?fecha=${fecha}`}>
           Nueva reserva
         </Link>
+        <Link className="boton secundario chico" href="/panel/salon">El salón</Link>
         <span className="quien">{ctx.sesion.nombre}</span>
         <form action={salir}>
           <button className="secundario chico" type="submit">Salir</button>

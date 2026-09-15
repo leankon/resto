@@ -31,6 +31,9 @@ export default function Login() {
           {enviando ? 'Entrando…' : 'Entrar'}
         </button>
       </form>
+      <p className="apagado" style={{ textAlign: 'center' }}>
+        <a href="/admin/login">Administración de la plataforma</a>
+      </p>
     </main>
   );
 }

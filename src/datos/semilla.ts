@@ -122,26 +122,37 @@ export async function crearLocal(admin: pg.Pool, datos: LocalNuevo): Promise<Loc
   }
 }
 
-/** Salón de ejemplo, el mismo con el que se testea el motor. */
+/**
+ * Salón de ejemplo. Las posiciones están en centímetros y elegidas para que se parezca
+ * a un local de verdad: una fila de mesas chicas contra una pared, un par de mesas de
+ * tres del otro lado, y las grandes sueltas.
+ *
+ * Con el radio por defecto (250 cm) el sistema deduce cuatro uniones posibles:
+ * 1+2, 2+3, 1+2+3 y 6+7. Todo lo demás queda demasiado lejos.
+ */
 export const SALON_DEMO: SalonNuevo[] = [
   {
     nombre: 'Planta baja',
     mesas: [
-      { nombre: '1', capacidadBase: 2, x: 0, y: 0 },
-      { nombre: '2', capacidadBase: 2, x: 200, y: 0 },
-      { nombre: '3', capacidadBase: 2, x: 420, y: 0 },
-      { nombre: '4', capacidadBase: 4, cabeceras: 2, x: 1000, y: 0 },
-      { nombre: '5', capacidadBase: 6, x: 2000, y: 0 },
-      { nombre: '6', capacidadBase: 3, x: 3000, y: 0 },
-      { nombre: '7', capacidadBase: 3, x: 3200, y: 0 },
-      { nombre: '8', capacidadBase: 8, capacidadMin: 5, x: 4000, y: 0 },
+      // Fila contra la ventana: se pueden ir uniendo de a una.
+      { nombre: '1', capacidadBase: 2, x: 100, y: 120 },
+      { nombre: '2', capacidadBase: 2, x: 300, y: 120 },
+      { nombre: '3', capacidadBase: 2, x: 520, y: 120 },
+      // Mesa rectangular con sillas de punta.
+      { nombre: '4', capacidadBase: 4, cabeceras: 2, x: 1100, y: 150 },
+      { nombre: '5', capacidadBase: 6, x: 1100, y: 520 },
+      // Par del otro lado del salón.
+      { nombre: '6', capacidadBase: 3, x: 400, y: 520 },
+      { nombre: '7', capacidadBase: 3, x: 600, y: 520 },
+      // La grande del fondo: no se usa para menos de cinco.
+      { nombre: '8', capacidadBase: 8, capacidadMin: 5, x: 1550, y: 700 },
     ],
   },
   {
     nombre: 'Terraza',
     mesas: [
-      { nombre: 'T1', capacidadBase: 4, x: 0, y: 0 },
-      { nombre: 'T2', capacidadBase: 4, x: 200, y: 0 },
+      { nombre: 'T1', capacidadBase: 4, x: 150, y: 150 },
+      { nombre: 'T2', capacidadBase: 4, x: 380, y: 150 },
     ],
   },
 ];

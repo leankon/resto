@@ -49,6 +49,19 @@ export async function requerirStaff(): Promise<ContextoStaff> {
   return { sesion: actual, tenantId: actual.tenantId, tenant: rows[0] };
 }
 
+/**
+ * Para lo que cambia la configuración del local, no la operación del día.
+ *
+ * Un mozo marca llegadas y carga reservas; rediseñar el salón mientras el turno está
+ * en marcha es otra cosa. Sin este corte, cualquiera con una sesión abierta en la
+ * tablet del salón puede borrar mesas.
+ */
+export async function requerirEncargado(): Promise<ContextoStaff> {
+  const ctx = await requerirStaff();
+  if (ctx.sesion.rol !== 'dueño' && ctx.sesion.rol !== 'encargado') redirect('/panel');
+  return ctx;
+}
+
 export async function requerirAdmin(): Promise<Extract<Sesion, { tipo: 'admin' }>> {
   const actual = await sesion();
   if (!actual || actual.tipo !== 'admin') redirect('/admin/login');

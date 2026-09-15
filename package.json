@@ -16,7 +16,8 @@
     "start": "next start -p 3000",
     "db:demo": "tsx scripts/semilla-demo.ts",
     "humo": "node scripts/humo.mjs",
-    "db:portabilidad": "./scripts/verificar-portabilidad.sh"
+    "db:portabilidad": "./scripts/verificar-portabilidad.sh",
+    "humo:salon": "node scripts/humo-salon.mjs"
   },
   "devDependencies": {
     "@types/pg": "^8.23.1",

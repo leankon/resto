@@ -19,6 +19,7 @@ npm run dev          # panel en http://localhost:3000
 npm test             # 107 tests
 npm run test:unit    # solo el motor, sin base de datos
 npm run humo         # recorrido de humo en navegador (requiere el server andando)
+npm run humo:salon   # recorrido de humo sobre la carga del salón
 ```
 
 Usuarios de prueba que deja `db:demo`:
@@ -31,7 +32,11 @@ Usuarios de prueba que deja `db:demo`:
 ## Estado
 
 **Fase 1 completa.** Motor de asignación, esquema con sus dos invariantes, caso de uso
-transaccional, login de staff, panel del local y panel de super-admin.
+transaccional, login de staff, panel del local con carga del salón, y panel de
+super-admin.
+
+El local carga sus mesas con capacidad, cabeceras y posición; qué mesas se pueden unir
+lo deduce el sistema de dónde están, y lo muestra en el plano mientras las acomodás.
 
 Sigue la Fase 2: web pública de reservas y widget embebible.
 
