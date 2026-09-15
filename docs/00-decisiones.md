@@ -77,3 +77,97 @@ propio — cierre de Fase 3 o comienzo de Fase 4, no parte del MVP conversaciona
 **Riesgo mientras tanto:** con número compartido, un local que genere bloqueos o reportes
 baja el rating del número para todos. Aceptable en piloto con 5–20 locales conocidos;
 no aceptable como estado final. Es la razón por la que el destino es número por local.
+
+---
+
+| # | Decisión | Fecha |
+|---|---|---|
+| D5 | Sin límite de pacing de cocina: mejor lleno con demora | 2026-09-15 |
+| D6 | Los walk-ins se cargan con un botón "ocupar mesa" en el panel | 2026-09-15 |
+| D7 | Las combinaciones se derivan solas por cercanía física + cabeceras | 2026-09-15 |
+| D8 | Grilla de reserva de 15 minutos | 2026-09-15 |
+| D9 | Pisos como solapas en el panel | 2026-09-15 |
+| D10 | El plano visual se difiere, pero las coordenadas x/y no | 2026-09-15 |
+
+## D5 — Sin límite de pacing
+
+No se modela cupo de cocina por franja. Si entran 40 personas a las 21:00, el sistema las
+acepta: preferible lleno con demora que mesas vacías.
+
+El motor no tiene nada que hacer con esto, pero sí el panel: la vista del día debería
+mostrar **cuánta gente entra por franja de 15 minutos**, para que el encargado vea venir
+el pico aunque el sistema no lo frene. La demora pasa a ser un riesgo de reputación del
+local, no una restricción del software — y es información que el local quiere tener a la
+vista, no un número que el sistema decide por él.
+
+## D6 — Walk-ins
+
+Botón "ocupar mesa" en el panel: el mozo marca mesa, cantidad de personas y hora de
+ingreso. Internamente es una reserva con `canal_origen = walk_in`, sin `cliente_id`, en
+estado `sentada`, con la duración de turno que corresponda al grupo y la franja.
+
+Bloquea la mesa exactamente igual que cualquier otra reserva — misma tabla, misma
+constraint `EXCLUDE`. **No hay un segundo mecanismo de ocupación que mantener en sincronía
+con el primero**, que es donde estos sistemas se rompen.
+
+Sin esto, el motor asigna mesas que físicamente están ocupadas y el error aparece en el
+peor momento posible: con el cliente parado en la puerta.
+
+## D7 — Combinaciones derivadas por cercanía
+
+**El local no carga combinaciones.** Carga mesas con su capacidad, sus cabeceras y su
+posición, y el sistema deduce qué se puede unir con qué. Detalle completo en el doc 03.
+
+Dos ideas, las dos salidas de cómo funciona un salón de verdad:
+
+1. **Cercanía, no adyacencia declarada.** Dos mesas se pueden unir si están a menos de
+   cierta distancia. Arrimar dos mesas que están a un metro es normal; traer una del otro
+   extremo del salón, no. Y la distancia **no es solo un filtro sí/no: es parte del
+   puntaje**, así que entre dos combinaciones válidas el motor elige la que hace mover
+   menos las mesas.
+2. **Cabeceras.** Una mesa de 4 rectangular sienta 6 agregando una silla en cada punta.
+   Se modela como capacidad extra disponible con una penalización leve, porque es real
+   pero menos cómodo. Es lo que evita unir dos mesas cuando alcanzaba con dos sillas.
+
+Así, un grupo de 6 se resuelve con la mejor de: una mesa de 6 libre → una de 4 con las dos
+cabeceras → dos de 3 pegadas → una de 4 más una de 2 al lado. En ese orden, y el orden lo
+produce el puntaje, no una lista de reglas escritas a mano.
+
+**Escape hatch:** una tabla opcional de combinaciones vetadas, para el caso real de dos
+mesas que están cerca pero no se pueden unir (una columna en el medio, tapan el paso al
+baño). Arranca vacía y no requiere ninguna carga en el alta del local.
+
+## D8 — Grilla de 15 minutos
+
+El cliente reserva a :00, :15, :30 o :45. Suficientes opciones sin fragmentar el salón en
+huecos de 8 minutos que no sirven para nada.
+
+La grilla aplica a lo que **elige el cliente**. El staff puede cargar cualquier horario a
+mano desde el panel, porque la realidad no se ajusta a la grilla.
+
+## D9 — Pisos como solapas
+
+Cada salón (`Planta baja`, `Terraza`, `Arriba`) es una solapa en la vista de ocupación.
+Ventaja secundaria: hace evidente de un vistazo si un piso está quedando vacío mientras
+el otro se llena, que es justo lo que el encargado quiere ver.
+
+Las mesas **no se combinan entre salones**: unir una mesa de la terraza con una de adentro
+no existe. La restricción cae sola del criterio de cercanía, pero se valida explícito.
+
+## D10 — El plano se difiere, las coordenadas no
+
+El plano visual (imagen de fondo, arrastrar mesas) queda para más adelante, como pediste.
+
+**Pero hay una consecuencia de D7 que conviene tener clara:** al derivar las combinaciones
+por cercanía, las coordenadas `x`/`y` dejaron de ser decoración del panel y pasaron a ser
+**entrada del motor de asignación**. Sin posiciones, el sistema no sabe qué mesas se pueden
+unir.
+
+Esto **no bloquea** la Fase 1. El motor se construye y se testea con coordenadas en
+fixtures. Para cargar un local real hacen falta las posiciones, pero alcanza con una
+grilla simple de números — la imagen de fondo y el drag & drop son la capa linda encima,
+y llegan en Fase 2.
+
+Si cuando me pases el plano resulta que las posiciones exactas son un problema, el
+fallback es agrupar mesas por sector (`ventana`, `fondo`, `barra`) y permitir unir dentro
+del mismo sector. Pierde el matiz de "a qué distancia", pero no requiere coordenadas.

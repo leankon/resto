@@ -17,12 +17,17 @@ IDs `uuid v7` (ordenables por tiempo, no filtran volumen como los seriales).
 
 **Salón**
 - `salones` — un nivel/piso. (`Planta baja`, `Terraza`). Un tenant tiene N.
-- `mesas` — `salon_id`, `nombre` (lo que dice el mozo: "12", "Barra 3"), `capacidad_min`,
-  `capacidad_max`, `x`, `y`, `ancho`, `alto`, `forma`, `rotacion`, `activa`.
+- `mesas` — `salon_id`, `nombre` (lo que dice el mozo: "12", "Barra 3"), `capacidad_base`,
+  `cabeceras` (0–2 sillas extra en las puntas), `capacidad_min`, `x`, `y`, `forma`,
+  `combinable`, `activa`.
   `capacidad_min` existe para no sentar una pareja en una mesa de 10 salvo que no haya otra.
-- `mesas_adyacencias` — par de mesas que se pueden unir. Grafo no dirigido.
-- `combinaciones` — combos válidos **precalculados** a partir del grafo, con capacidad
-  resultante y un costo. Se recalculan cuando cambia el plano, no en cada búsqueda.
+  `combinable = false` para lo que no se mueve: barra, mesas empotradas, bancos de pared.
+- `combinaciones_vetadas` — par de mesas que el sistema uniría por cercanía pero en la
+  práctica no se pueden unir (una columna en el medio, tapan el paso al baño). Arranca
+  vacía; es un escape hatch, no un paso del alta.
+
+**No hay tabla de adyacencias ni de combinaciones válidas** (D7): se derivan de las
+posiciones en cada recálculo del plano. El local carga mesas, no combinaciones.
 - `horarios_servicio` — por día de semana: apertura, cierre, último ingreso, salón activo.
 - `excepciones_calendario` — feriados, cierres, horarios especiales, eventos privados.
 - `bloqueos` — mesa fuera de servicio en un rango (mantenimiento, evento).
@@ -129,16 +134,20 @@ la hora de **inicio**, no por la de fin. Simple y predecible.
 1. **Resolver turno.** Duración + buffer → `periodo = [inicio, inicio+duracion+buffer)`.
 2. **Validar calendario.** Horario de servicio del día, excepciones, último ingreso.
    Si falla acá, no se busca nada: se responde con el motivo.
-3. **Generar candidatos.**
-   - Mesas individuales con `capacidad_min <= personas <= capacidad_max`.
-   - Si no hay ninguna que entre, combos precalculados con capacidad suficiente,
-     limitados a **máximo 3 mesas** (más que eso es incómodo para el comensal y
-     explota la combinatoria).
+3. **Generar candidatos** (ver "Cómo se derivan las combinaciones", más abajo).
+   - Mesas individuales cuya capacidad alcance, con o sin cabeceras.
+   - Combinaciones derivadas por cercanía, de **máximo 3 mesas** (más que eso es incómodo
+     para el comensal y explota la combinatoria).
 4. **Filtrar por disponibilidad.** Descartar los que solapan con `reservas_mesas`
    bloqueantes y con `bloqueos` en ese periodo.
 5. **Puntuar.** Menor puntaje gana:
    - `desperdicio` = capacidad − personas, con peso alto. Es el criterio principal.
-   - `penalizacion_combo` = (cantidad de mesas − 1) × peso. Una mesa siempre le gana a dos.
+   - `mesa_extra` = (cantidad de mesas − 1) × peso. Una mesa siempre le gana a dos.
+   - `distancia` = metros que hay que arrimar las mesas, × peso. Entre dos combinaciones
+     válidas, gana la que mueve menos el salón. Es lo que implementa "no traer una mesa
+     del otro extremo".
+   - `cabeceras` = sillas de punta usadas × peso. Real pero menos cómodo: se prefiere una
+     mesa que alcance sin agregar sillas.
    - `escasez`: penalizar consumir una mesa que es de las pocas que sirven para grupos
      grandes. Se calcula como "cuántos tamaños de grupo quedarían sin opción si uso esta".
      Es lo que evita regalar la mesa de 8 a una pareja.
@@ -149,6 +158,42 @@ la hora de **inicio**, no por la de fin. Simple y predecible.
      mismo output (imprescindible para testear).
 6. **Si no hay candidato:** buscar en una grilla de ±15/30/60 minutos y devolver los
    horarios que sí tienen lugar. Solo si tampoco hay, ofrecer lista de espera.
+
+### Cómo se derivan las combinaciones (D7)
+
+El local no carga combinaciones. Carga mesas con capacidad, cabeceras y posición, y el
+sistema deduce el resto en cada recálculo del plano.
+
+**Capacidad de una mesa.** `capacidad_base` son las sillas que tiene puestas.
+`cabeceras` (0, 1 o 2) son las sillas que se pueden sumar en las puntas: una mesa
+rectangular de 4 sienta 6 así. Entonces `capacidad_max = capacidad_base + cabeceras`, y
+usar una cabecera suma penalización — es real, pero se come el codo del de al lado.
+
+**Qué se puede unir.** Dos mesas son unibles si: mismo salón, las dos `combinable`, no
+están vetadas, y la distancia entre sus centros es menor a `radio_combinacion_cm`
+(por defecto 250 cm, configurable por local). Eso arma un grafo.
+
+**Qué combinaciones existen.** Los subconjuntos **conexos** del grafo de hasta 3 mesas.
+Conexos importa: tres mesas en fila (A–B–C) valen aunque A y C estén lejos entre sí,
+porque B las une. Tres mesas en las tres esquinas del salón, no.
+
+**Capacidad de una combinación.**
+`Σ capacidad_base − perdida_por_union × (n − 1) + cabeceras del combo` (máximo 2, las de
+los dos extremos). `perdida_por_union` arranca en 0 y el local la sube si en la práctica
+al juntar mesas pierde sillas.
+
+**Costo de una combinación.** La distancia total es el peso del árbol generador mínimo del
+subconjunto: cuánto hay que arrimar, en total, para armar esa mesa. Va al puntaje, no al
+filtro.
+
+El resultado es que un grupo de 6 se resuelve, en este orden, con lo mejor que haya libre:
+una mesa de 6 → una de 4 con las dos cabeceras → dos de 3 pegadas → una de 4 más una de 2
+al lado. **Ese orden no está escrito en ningún lado: lo produce el puntaje.** Cambiar la
+prioridad del local es mover un peso, no reescribir reglas.
+
+**Recálculo.** El grafo y los combos se recalculan cuando cambia el plano (alta/baja de
+mesa, mover una, cambiar el radio), no en cada búsqueda. Con ≤50 mesas y combos de hasta
+3, el recálculo completo son milisegundos.
 
 ### Grupos que no entran en ninguna mesa ni combo
 

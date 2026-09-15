@@ -3,7 +3,7 @@
 Lo que falta definir para arrancar la Fase 1. Las **bloqueantes** cambian el modelo de
 datos; las demás se pueden decidir sobre la marcha con un default razonable.
 
-> Las preguntas 1, 2, 3 y 6 ya están resueltas — ver [doc 00](00-decisiones.md).
+> Resueltas: 1, 2, 3, 6 (D1–D4) y 4, 5, 12 (D5–D10). Ver [doc 00](00-decisiones.md).
 
 ## Bloqueantes para Fase 1
 
