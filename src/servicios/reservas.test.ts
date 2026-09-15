@@ -255,6 +255,22 @@ describe('estados y historial del cliente', () => {
 
   it('finalizar antes devuelve los minutos que sobraron al inventario', async () => {
     // La mesa queda libre para el resto del turno, pero no se borra que estuvo ocupada.
+    //
+    // El local abre las 24 horas solo para este test: usa la hora real (porque
+    // `finalizada` recorta contra `now()`), y si dependiera del horario de servicio
+    // pasaría de noche y fallaría a la mañana.
+    await admin.query(
+      `UPDATE franjas_servicio
+          SET desde = '00:00', hasta = '23:59', ultimo_ingreso = '23:59'
+        WHERE tenant_id = $1 AND nombre = 'Cena'`,
+      [local.tenantId],
+    );
+    await admin.query(
+      `UPDATE franjas_servicio SET activa = false
+        WHERE tenant_id = $1 AND nombre = 'Almuerzo'`,
+      [local.tenantId],
+    );
+
     const creada = await reservar({ inicio: new Date(Date.now() - 30 * 60_000) });
     if (creada.tipo !== 'creada') throw new Error('no asignó');
 
@@ -275,6 +291,25 @@ describe('estados y historial del cliente', () => {
       creada.reservaId,
     ]);
     expect(rows[0].estado).toBe('finalizada');
+  });
+
+  it('finalizar una reserva que todavía no empezó libera la mesa sin romper nada', async () => {
+    // Un botón mal apretado no puede tirar un error de rango inválido.
+    const creada = await reservar({ inicio: new Date(Date.now() + 6 * 3600_000) });
+    if (creada.tipo !== 'creada') throw new Error('no asignó');
+
+    await expect(
+      cambiarEstado(app, {
+        tenantId: local.tenantId, reservaId: creada.reservaId,
+        estado: 'finalizada', actor: STAFF,
+      }),
+    ).resolves.toEqual({ tipo: 'actualizada' });
+
+    const { rows } = await admin.query(
+      `SELECT isempty(periodo) AS vacio FROM reservas_mesas WHERE reserva_id = $1`,
+      [creada.reservaId],
+    );
+    expect(rows[0].vacio).toBe(true); // rango vacío: la mesa vuelve al inventario
   });
 });
 

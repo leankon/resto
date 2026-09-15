@@ -27,10 +27,20 @@ BEGIN
   IF NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'resto_admin') THEN
     CREATE ROLE resto_admin LOGIN PASSWORD 'dev';
   END IF;
-  -- Converge el estado en vez de solo crear: una base que ya tenía estos roles con
-  -- BYPASSRLS tiene que quedar igual que una recién creada.
-  ALTER ROLE resto_app NOBYPASSRLS NOSUPERUSER;
-  ALTER ROLE resto_admin NOBYPASSRLS NOSUPERUSER;
+  -- Converge el estado, pero solo si hace falta: cambiar SUPERUSER o BYPASSRLS exige
+  -- ser superusuario de verdad, y en Postgres gestionado (Neon, Supabase, RDS) no lo
+  -- somos. Ahí los roles nacen sin esos atributos, así que no hay nada que corregir y
+  -- este bloque no se ejecuta. En una base propia que ya los tenía, sí corrige.
+  --
+  -- Si algún día esta condición diera verdadera en una base gestionada, que falle es
+  -- lo correcto: significaría que los roles pueden saltear el aislamiento entre
+  -- locales, y eso tiene que enterarse alguien en vez de pasar en silencio.
+  IF EXISTS (SELECT 1 FROM pg_roles
+              WHERE rolname IN ('resto_app', 'resto_admin')
+                AND (rolsuper OR rolbypassrls)) THEN
+    ALTER ROLE resto_app NOBYPASSRLS NOSUPERUSER;
+    ALTER ROLE resto_admin NOBYPASSRLS NOSUPERUSER;
+  END IF;
 END $$;
 
 -- ---------------------------------------------------------------------------

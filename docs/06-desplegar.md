@@ -53,6 +53,20 @@ Lo que el esquema **no** necesita, y por eso se puede desplegar:
    for f in src/datos/migraciones/*.sql; do psql "$ADMIN" -v ON_ERROR_STOP=1 -f "$f"; done
    ```
 
+   Dos cosas que se descubren recién al correrlas contra Postgres gestionado, y que
+   el esquema ya contempla:
+
+   - El usuario con el que entrás **no es superusuario**, así que no puede tocar los
+     atributos `SUPERUSER` ni `BYPASSRLS` de ningún rol. Las migraciones solo lo
+     intentan si hace falta corregir algo, cosa que en una base nueva nunca pasa.
+   - `FORCE ROW LEVEL SECURITY` aplica las políticas **también al dueño de las
+     tablas**. O sea que después de instalar, un `SELECT * FROM reservas` desde el
+     editor SQL te va a devolver cero filas: no es que falten datos, es que no sos
+     ninguno de los roles con permiso. Para mirar, primero `SET ROLE resto_admin;`.
+
+   `npm run db:portabilidad` simula todo esto en local (un usuario con `CREATEROLE`
+   pero sin superusuario) para que estos errores no aparezcan recién en el despliegue.
+
 3. **Cambiar las contraseñas de los tres roles.** Las migraciones los crean con `dev`,
    que está bien en tu máquina y no está bien en internet:
 

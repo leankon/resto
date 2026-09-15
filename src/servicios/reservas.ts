@@ -321,11 +321,17 @@ export async function cambiarEstado(
     if (!reserva) return { tipo: 'reserva_inexistente' as const };
 
     if (entrada.estado === 'finalizada') {
+      // `greatest` con el inicio no es defensivo porque sí: finalizar una reserva que
+      // todavía no empezó daría un rango con el fin antes del principio y Postgres
+      // rechaza eso con un error. Así, el rango queda vacío y la mesa se libera, que
+      // es lo que quiso decir quien apretó el botón.
       await c.query(
         `UPDATE reservas_mesas
-            SET periodo = tstzrange(lower(periodo),
-                                    least(upper(periodo), now() + ($2 || ' minutes')::interval),
-                                    '[)')
+            SET periodo = tstzrange(
+                  lower(periodo),
+                  greatest(lower(periodo),
+                           least(upper(periodo), now() + ($2 || ' minutes')::interval)),
+                  '[)')
           WHERE reserva_id = $1 AND upper(periodo) > now()`,
         [entrada.reservaId, reserva.buffer_min],
       );

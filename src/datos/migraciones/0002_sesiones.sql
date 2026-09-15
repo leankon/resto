@@ -26,7 +26,11 @@ BEGIN
   IF NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'resto_auth') THEN
     CREATE ROLE resto_auth LOGIN PASSWORD 'dev';
   END IF;
-  ALTER ROLE resto_auth NOBYPASSRLS NOSUPERUSER;
+  -- Ver la nota en 0001: solo se corrige si hace falta y si se puede.
+  IF EXISTS (SELECT 1 FROM pg_roles
+              WHERE rolname = 'resto_auth' AND (rolsuper OR rolbypassrls)) THEN
+    ALTER ROLE resto_auth NOBYPASSRLS NOSUPERUSER;
+  END IF;
 END $$;
 
 GRANT USAGE ON SCHEMA public TO resto_auth;
