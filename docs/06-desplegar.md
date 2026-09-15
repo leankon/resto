@@ -91,6 +91,30 @@ Lo que el esquema **no** necesita, y por eso se puede desplegar:
 4. Armar las tres URLs con esas contraseñas. TLS se activa solo: `conexion.ts` cifra
    todo lo que no sea localhost.
 
+## 1.bis Que las migraciones se apliquen solas
+
+Cada cambio de esquema obligaba a entrar al panel del proveedor y pegar SQL a mano, y
+olvidarse no daba un error claro: daba una pantalla de "Application error" en la página
+que usaba la columna nueva. Eso ya no hace falta.
+
+El build corre `scripts/migrar.ts` antes de compilar: aplica las migraciones pendientes,
+lleva registro en la tabla `migraciones_aplicadas`, y corta el despliegue si alguna
+falla — mejor no publicar que publicar código que su base no soporta.
+
+Para que funcione hay que cargar **una variable de entorno más**, con la conexión del
+**dueño** de la base:
+
+```
+DATABASE_URL_OWNER=postgresql://neondb_owner:CLAVE@HOST/neondb?sslmode=require
+```
+
+Es la única que necesita ser dueño: crear tablas y cambiar columnas requiere serlo, y
+los tres roles de la aplicación no lo son a propósito. Solo se usa durante el build,
+nunca en tiempo de ejecución.
+
+Si la variable no está, el script no hace nada y avisa, así un build local no se cae
+por no tener credenciales de migración.
+
 ## 2. El hosting
 
 **Vercel, plan Hobby.** Gratis y es el camino más corto para Next.js: conectás el repo

@@ -14,6 +14,7 @@ Postgres estándar, así que lo que corre local corre igual en Supabase, Neon o 
 npm install
 npm run db:start     # levanta Postgres, crea la base y aplica migraciones
 npm run db:demo      # carga un local de prueba con reservas
+npm run db:migrar    # aplica migraciones pendientes (necesita DATABASE_URL_OWNER)
 npm run dev          # panel en http://localhost:3000
 
 npm test             # 107 tests

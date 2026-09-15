@@ -12,12 +12,13 @@
     "db:reset": "./scripts/db-local.sh reset",
     "db:psql": "./scripts/db-local.sh psql",
     "dev": "next dev -p 3000",
-    "build": "next build",
+    "build": "tsx scripts/migrar.ts && next build",
     "start": "next start -p 3000",
     "db:demo": "tsx scripts/semilla-demo.ts",
     "humo": "node scripts/humo.mjs",
     "db:portabilidad": "./scripts/verificar-portabilidad.sh",
-    "humo:salon": "node scripts/humo-salon.mjs"
+    "humo:salon": "node scripts/humo-salon.mjs",
+    "db:migrar": "tsx scripts/migrar.ts"
   },
   "devDependencies": {
     "@types/pg": "^8.23.1",
