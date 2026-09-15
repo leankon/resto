@@ -22,6 +22,7 @@ npm run test:unit    # solo el motor, sin base de datos
 npm run humo         # recorrido de humo en navegador (requiere el server andando)
 npm run humo:salon     # recorrido de humo sobre la carga del salón
 npm run humo:horarios  # recorrido de humo sobre horarios y turnos
+npm run humo:equipo    # recorrido de humo sobre el equipo y los permisos
 ```
 
 Usuarios de prueba que deja `db:demo`:
@@ -33,12 +34,19 @@ Usuarios de prueba que deja `db:demo`:
 
 ## Estado
 
-**Fase 1 completa.** Motor de asignación, esquema con sus dos invariantes, caso de uso
-transaccional, login de staff, panel del local con carga del salón, y panel de
-super-admin.
+**Fase 1 completa.** Un local se puede dar de alta y operar de punta a punta:
 
-El local carga sus mesas con capacidad, cabeceras y posición; qué mesas se pueden unir
-lo deduce el sistema de dónde están, y lo muestra en el plano mientras las acomodás.
+- **Plataforma** (`/admin`): alta de locales con su dueño, suspender y reactivar.
+- **El salón**: salones con medidas reales, mesas con capacidad, cabeceras, forma y
+  posición. Qué mesas se pueden unir lo deduce el sistema de dónde están, y lo muestra
+  en el plano mientras las acomodás — con el motivo cuando dos que parecen vecinas no
+  se van a unir.
+- **Horarios y turnos**: franjas de servicio, cuánto ocupa la mesa cada grupo, y días
+  especiales (feriados, horarios acotados) que el motor respeta.
+- **El equipo**: quién entra al panel y con qué permisos. Un mozo opera el día; el salón
+  y los horarios son de encargado para arriba; el equipo, solo del dueño.
+- **El día**: planilla con el historial de cada cliente, alta de reservas de mostrador,
+  walk-ins, llegadas y ausencias, y cambio de mesa a mano con auditoría.
 
 Sigue la Fase 2: web pública de reservas y widget embebible.
 

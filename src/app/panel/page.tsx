@@ -10,6 +10,10 @@ type Parametros = Promise<{ fecha?: string; salon?: string; hora?: string }>;
 export default async function Panel({ searchParams }: { searchParams: Parametros }) {
   const { fecha: fechaCruda, salon: salonPedido, hora: horaPedida } = await searchParams;
   const ctx = await requerirStaff();
+  const esDuenio = ctx.sesion.rol === 'dueño';
+  // El menú muestra solo lo que esta persona puede abrir: un botón que lleva a una
+  // pantalla que te rebota es peor que no tener el botón.
+  const puedeConfigurar = esDuenio || ctx.sesion.rol === 'encargado';
   const { tz } = ctx.tenant;
 
   const fecha = /^\d{4}-\d{2}-\d{2}$/.test(fechaCruda ?? '') ? fechaCruda! : hoyEn(tz);
@@ -36,8 +40,15 @@ export default async function Panel({ searchParams }: { searchParams: Parametros
         <Link className="boton chico" href={`/panel/nueva?fecha=${fecha}`}>
           Nueva reserva
         </Link>
-        <Link className="boton secundario chico" href="/panel/salon">El salón</Link>
-        <Link className="boton secundario chico" href="/panel/horarios">Horarios</Link>
+        {puedeConfigurar && (
+          <>
+            <Link className="boton secundario chico" href="/panel/salon">El salón</Link>
+            <Link className="boton secundario chico" href="/panel/horarios">Horarios</Link>
+          </>
+        )}
+        {esDuenio && (
+          <Link className="boton secundario chico" href="/panel/equipo">Equipo</Link>
+        )}
         <span className="quien">{ctx.sesion.nombre}</span>
         <form action={salir}>
           <button className="secundario chico" type="submit">Salir</button>

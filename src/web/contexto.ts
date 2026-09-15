@@ -62,6 +62,13 @@ export async function requerirEncargado(): Promise<ContextoStaff> {
   return ctx;
 }
 
+/** Manejar el equipo es del dueño: un encargado no decide quién entra al panel. */
+export async function requerirDuenio(): Promise<ContextoStaff> {
+  const ctx = await requerirStaff();
+  if (ctx.sesion.rol !== 'dueño') redirect('/panel');
+  return ctx;
+}
+
 export async function requerirAdmin(): Promise<Extract<Sesion, { tipo: 'admin' }>> {
   const actual = await sesion();
   if (!actual || actual.tipo !== 'admin') redirect('/admin/login');

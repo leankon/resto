@@ -12,6 +12,7 @@ export default async function Salon({
 }) {
   const { salon: pedido } = await searchParams;
   const ctx = await requerirEncargado();
+  const esDuenio = ctx.sesion.rol === 'dueño';
   const plano = await cargarPlanoCompleto(poolApp(), ctx.tenantId);
   const activo = plano.salones.find((s) => s.id === pedido) ?? plano.salones[0];
   const radio = plano.config.radioCombinacionCm;
@@ -28,6 +29,9 @@ export default async function Salon({
       <header className="barra">
         <span className="marca">{ctx.tenant.nombre}</span>
         <Link className="boton secundario chico" href="/panel/horarios">Horarios</Link>
+        {esDuenio && (
+          <Link className="boton secundario chico" href="/panel/equipo">Equipo</Link>
+        )}
         <Link className="boton secundario chico" href="/panel">Volver al día</Link>
       </header>
 

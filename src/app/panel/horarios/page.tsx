@@ -5,6 +5,7 @@ import { Duraciones, Excepciones, Franjas, NombreDelLocal } from './formularios'
 
 export default async function Horarios() {
   const ctx = await requerirEncargado();
+  const esDuenio = ctx.sesion.rol === 'dueño';
   const config = await cargarConfiguracion(poolApp(), ctx.tenantId);
   const sinFranjasActivas = config.franjas.every((f) => !f.activa);
 
@@ -13,6 +14,9 @@ export default async function Horarios() {
       <header className="barra">
         <span className="marca">{ctx.tenant.nombre}</span>
         <Link className="boton secundario chico" href="/panel/salon">El salón</Link>
+        {esDuenio && (
+          <Link className="boton secundario chico" href="/panel/equipo">Equipo</Link>
+        )}
         <Link className="boton secundario chico" href="/panel">Volver al día</Link>
       </header>
 
