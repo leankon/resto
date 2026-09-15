@@ -5,10 +5,16 @@
   "type": "module",
   "scripts": {
     "test": "vitest run",
+    "test:unit": "vitest run src/dominio",
     "test:watch": "vitest",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "db:start": "./scripts/db-local.sh start",
+    "db:reset": "./scripts/db-local.sh reset",
+    "db:psql": "./scripts/db-local.sh psql"
   },
   "devDependencies": {
+    "@types/pg": "^8.23.1",
+    "pg": "^8.23.0",
     "typescript": "^5.6.3",
     "vitest": "^2.1.8"
   }

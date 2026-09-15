@@ -5,7 +5,22 @@ reservas, su plano de salón y su panel de staff, todo corriendo sobre la misma 
 Asignación automática de mesas, lista de espera, notificaciones multi-canal y reservas por
 WhatsApp.
 
-**Estado: fase de diseño. No hay código todavía.**
+## Cómo correrlo
+
+No hace falta ninguna cuenta en la nube para trabajar en la Fase 1. El esquema usa
+Postgres estándar, así que lo que corre local corre igual en Supabase, Neon o Railway.
+
+```bash
+npm install
+npm run db:start     # levanta Postgres, crea la base y aplica migraciones
+npm test             # 49 tests: motor de asignación + invariantes del esquema
+npm run test:unit    # solo el motor, sin base de datos
+```
+
+## Estado
+
+Fase 1 en curso. Listo el motor de asignación (`src/dominio/`) y el esquema con sus dos
+invariantes (`src/datos/`). Falta el caso de uso transaccional, auth de staff y el panel.
 
 ## Documentos de decisión
 

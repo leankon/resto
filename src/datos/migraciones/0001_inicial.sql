@@ -1,0 +1,373 @@
+-- Fase 1: núcleo multi-tenant + inventario de mesas.
+--
+-- Dos invariantes viven acá y no en el código de aplicación:
+--   1. Ninguna mesa puede estar ocupada dos veces a la vez (constraint EXCLUDE).
+--   2. Ningún tenant puede leer datos de otro (row level security).
+-- Todo lo demás es negociable; esto no.
+
+CREATE EXTENSION IF NOT EXISTS btree_gist;   -- permite mezclar = y && en un EXCLUDE
+CREATE EXTENSION IF NOT EXISTS pgcrypto;     -- gen_random_uuid()
+
+-- ---------------------------------------------------------------------------
+-- Roles
+-- ---------------------------------------------------------------------------
+-- El superusuario IGNORA las políticas de RLS. Si la app se conecta como
+-- postgres, el aislamiento entre locales no existe y nadie se entera hasta que
+-- un local ve las reservas de otro. La app usa resto_app y nada más.
+DO $$
+BEGIN
+  IF NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'resto_app') THEN
+    CREATE ROLE resto_app LOGIN PASSWORD 'dev';
+  END IF;
+  IF NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'resto_admin') THEN
+    CREATE ROLE resto_admin LOGIN PASSWORD 'dev' BYPASSRLS;
+  END IF;
+END $$;
+
+-- ---------------------------------------------------------------------------
+-- Plataforma
+-- ---------------------------------------------------------------------------
+CREATE TABLE tenants (
+  id            uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  slug          text NOT NULL UNIQUE,
+  nombre        text NOT NULL,
+  tz            text NOT NULL DEFAULT 'America/Argentina/Buenos_Aires',
+  pais          text NOT NULL DEFAULT 'AR',   -- para normalizar teléfonos a E.164
+  estado        text NOT NULL DEFAULT 'activo'
+                CHECK (estado IN ('activo', 'suspendido')),
+  config        jsonb NOT NULL DEFAULT '{}'::jsonb,
+  creado_en     timestamptz NOT NULL DEFAULT now(),
+  actualizado_en timestamptz NOT NULL DEFAULT now()
+);
+
+-- Vacía en Fase 1. Existe para que sumar dominio propio no sea una migración dolorosa.
+CREATE TABLE tenant_dominios (
+  id         uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  tenant_id  uuid NOT NULL REFERENCES tenants(id) ON DELETE CASCADE,
+  dominio    text NOT NULL UNIQUE,
+  verificado boolean NOT NULL DEFAULT false,
+  creado_en  timestamptz NOT NULL DEFAULT now()
+);
+
+-- 1:N desde el día uno (D4): el número compartido es una fila más.
+CREATE TABLE tenant_canales_whatsapp (
+  id            uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  tenant_id     uuid NOT NULL REFERENCES tenants(id) ON DELETE CASCADE,
+  numero_e164   text NOT NULL,
+  phone_number_id text NOT NULL,
+  es_compartido boolean NOT NULL DEFAULT false,
+  activo        boolean NOT NULL DEFAULT true,
+  creado_en     timestamptz NOT NULL DEFAULT now()
+);
+
+-- Un admin de plataforma no es un usuario con un flag: mezclarlos es cómo se
+-- filtran privilegios.
+CREATE TABLE admins_plataforma (
+  id        uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  email     text NOT NULL UNIQUE,
+  hash      text NOT NULL,
+  nombre    text NOT NULL,
+  creado_en timestamptz NOT NULL DEFAULT now()
+);
+
+CREATE TABLE usuarios (
+  id        uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  email     text NOT NULL UNIQUE,
+  hash      text NOT NULL,
+  nombre    text NOT NULL,
+  activo    boolean NOT NULL DEFAULT true,
+  creado_en timestamptz NOT NULL DEFAULT now()
+);
+
+-- N:M: una persona puede trabajar en dos locales sin duplicar cuenta.
+CREATE TABLE usuarios_tenants (
+  usuario_id uuid NOT NULL REFERENCES usuarios(id) ON DELETE CASCADE,
+  tenant_id  uuid NOT NULL REFERENCES tenants(id) ON DELETE CASCADE,
+  rol        text NOT NULL CHECK (rol IN ('dueño', 'encargado', 'mozo')),
+  creado_en  timestamptz NOT NULL DEFAULT now(),
+  PRIMARY KEY (usuario_id, tenant_id)
+);
+
+-- ---------------------------------------------------------------------------
+-- Salón
+-- ---------------------------------------------------------------------------
+CREATE TABLE salones (
+  id        uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  tenant_id uuid NOT NULL REFERENCES tenants(id) ON DELETE CASCADE,
+  nombre    text NOT NULL,
+  orden     int  NOT NULL DEFAULT 0,   -- orden de las solapas en el panel (D9)
+  activo    boolean NOT NULL DEFAULT true
+);
+CREATE INDEX ON salones (tenant_id);
+
+CREATE TABLE mesas (
+  id             uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  tenant_id      uuid NOT NULL REFERENCES tenants(id) ON DELETE CASCADE,
+  salon_id       uuid NOT NULL REFERENCES salones(id) ON DELETE CASCADE,
+  nombre         text NOT NULL,
+  capacidad_base int  NOT NULL CHECK (capacidad_base > 0),
+  cabeceras      int  NOT NULL DEFAULT 0 CHECK (cabeceras BETWEEN 0 AND 2),
+  capacidad_min  int  NOT NULL DEFAULT 1 CHECK (capacidad_min > 0),
+  -- Centro de la mesa sobre el plano. Desde D7 son entrada del motor, no decoración.
+  x              int NOT NULL DEFAULT 0,
+  y              int NOT NULL DEFAULT 0,
+  forma          text NOT NULL DEFAULT 'rect'
+                 CHECK (forma IN ('rect', 'redonda', 'barra')),
+  combinable     boolean NOT NULL DEFAULT true,
+  activa         boolean NOT NULL DEFAULT true,
+  creado_en      timestamptz NOT NULL DEFAULT now(),
+  UNIQUE (tenant_id, salon_id, nombre)
+);
+CREATE INDEX ON mesas (tenant_id, salon_id);
+
+-- Escape hatch: dos mesas cerca que en la práctica no se pueden unir (una columna
+-- en el medio). Arranca vacía; no es un paso del alta.
+CREATE TABLE combinaciones_vetadas (
+  tenant_id uuid NOT NULL REFERENCES tenants(id) ON DELETE CASCADE,
+  mesa_a_id uuid NOT NULL REFERENCES mesas(id) ON DELETE CASCADE,
+  mesa_b_id uuid NOT NULL REFERENCES mesas(id) ON DELETE CASCADE,
+  motivo    text,
+  PRIMARY KEY (mesa_a_id, mesa_b_id),
+  CHECK (mesa_a_id < mesa_b_id)   -- par canónico: una sola fila por combinación
+);
+
+CREATE TABLE franjas_servicio (
+  id             uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  tenant_id      uuid NOT NULL REFERENCES tenants(id) ON DELETE CASCADE,
+  nombre         text NOT NULL,
+  dias           int[] NOT NULL,      -- 0 = domingo
+  desde          time NOT NULL,
+  hasta          time NOT NULL,       -- si hasta <= desde, cruza medianoche
+  ultimo_ingreso time NOT NULL,
+  activa         boolean NOT NULL DEFAULT true
+);
+CREATE INDEX ON franjas_servicio (tenant_id);
+
+-- D1: la duración no es un número de config, es una tabla de reglas.
+CREATE TABLE duraciones_turno (
+  id           uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  tenant_id    uuid NOT NULL REFERENCES tenants(id) ON DELETE CASCADE,
+  franja_id    uuid REFERENCES franjas_servicio(id) ON DELETE CASCADE,  -- NULL = comodín
+  personas_min int NOT NULL,
+  personas_max int NOT NULL,
+  duracion_min int NOT NULL CHECK (duracion_min > 0),
+  buffer_min   int NOT NULL DEFAULT 15 CHECK (buffer_min >= 0),
+  CHECK (personas_min <= personas_max)
+);
+CREATE INDEX ON duraciones_turno (tenant_id);
+
+CREATE TABLE excepciones_calendario (
+  id        uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  tenant_id uuid NOT NULL REFERENCES tenants(id) ON DELETE CASCADE,
+  fecha     date NOT NULL,
+  cerrado   boolean NOT NULL DEFAULT false,
+  desde     time,
+  hasta     time,
+  motivo    text,
+  UNIQUE (tenant_id, fecha)
+);
+
+-- ---------------------------------------------------------------------------
+-- Clientes
+-- ---------------------------------------------------------------------------
+-- El historial es POR LOCAL y no se cruza entre tenants: dos locales que tienen
+-- al mismo comensal ven dos filas distintas. Lo pide el brief y además es lo
+-- correcto legalmente. El cliente nunca crea una cuenta.
+CREATE TABLE clientes (
+  id              uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  tenant_id       uuid NOT NULL REFERENCES tenants(id) ON DELETE CASCADE,
+  telefono_e164   text,
+  email           text,
+  nombre          text NOT NULL,
+  visitas         int NOT NULL DEFAULT 0,
+  no_shows        int NOT NULL DEFAULT 0,
+  cancelaciones   int NOT NULL DEFAULT 0,
+  ultima_visita_en timestamptz,
+  notas           text,
+  etiquetas       text[] NOT NULL DEFAULT '{}',
+  creado_en       timestamptz NOT NULL DEFAULT now(),
+  actualizado_en  timestamptz NOT NULL DEFAULT now(),
+  CHECK (telefono_e164 IS NOT NULL OR email IS NOT NULL)
+);
+-- Índices parciales: el teléfono identifica al cliente dentro del local; si no
+-- dejó teléfono, el mail hace de identificador alternativo.
+CREATE UNIQUE INDEX clientes_tenant_telefono
+  ON clientes (tenant_id, telefono_e164) WHERE telefono_e164 IS NOT NULL;
+CREATE UNIQUE INDEX clientes_tenant_email
+  ON clientes (tenant_id, lower(email)) WHERE email IS NOT NULL;
+
+-- ---------------------------------------------------------------------------
+-- Reservas
+-- ---------------------------------------------------------------------------
+CREATE TABLE reservas (
+  id            uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  tenant_id     uuid NOT NULL REFERENCES tenants(id) ON DELETE CASCADE,
+  cliente_id    uuid REFERENCES clientes(id) ON DELETE SET NULL,  -- NULL en walk-in
+  inicio        timestamptz NOT NULL,
+  duracion_min  int NOT NULL CHECK (duracion_min > 0),
+  buffer_min    int NOT NULL DEFAULT 15,
+  personas      int NOT NULL CHECK (personas > 0),
+  estado        text NOT NULL DEFAULT 'confirmada' CHECK (estado IN (
+                  'confirmada', 'sentada', 'finalizada',
+                  'cancelada', 'no_show', 'hold', 'en_riesgo')),
+  canal_origen  text NOT NULL CHECK (canal_origen IN (
+                  'web', 'widget', 'whatsapp', 'manual', 'walk_in')),
+  notas         text,
+  creada_por_usuario_id uuid REFERENCES usuarios(id) ON DELETE SET NULL,
+  expira_en     timestamptz,   -- solo para estado 'hold' (ofertas de lista de espera)
+  creado_en     timestamptz NOT NULL DEFAULT now(),
+  actualizado_en timestamptz NOT NULL DEFAULT now(),
+  -- Un walk-in no tiene cliente; una reserva de cualquier otro canal sí.
+  CHECK (canal_origen = 'walk_in' OR cliente_id IS NOT NULL)
+);
+CREATE INDEX ON reservas (tenant_id, inicio);
+CREATE INDEX ON reservas (tenant_id, estado, inicio);
+CREATE INDEX ON reservas (cliente_id);
+
+-- El inventario. Una reserva tiene N filas acá si ocupa una combinación.
+CREATE TABLE reservas_mesas (
+  id          uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  tenant_id   uuid NOT NULL REFERENCES tenants(id) ON DELETE CASCADE,
+  reserva_id  uuid NOT NULL REFERENCES reservas(id) ON DELETE CASCADE,
+  mesa_id     uuid NOT NULL REFERENCES mesas(id) ON DELETE CASCADE,
+  periodo     tstzrange NOT NULL,   -- incluye el buffer de limpieza
+  -- D2: el re-optimizador nunca pisa una decisión humana.
+  fijada_manualmente boolean NOT NULL DEFAULT false,
+  bloqueante  boolean NOT NULL DEFAULT true,
+  creado_en   timestamptz NOT NULL DEFAULT now(),
+
+  -- EL invariante del sistema. Con esto, ningún bug de aplicación, ninguna
+  -- carrera entre canales y ningún INSERT a mano desde psql puede sentar dos
+  -- reservas en la misma mesa a la misma hora.
+  CONSTRAINT reservas_mesas_sin_solape
+    EXCLUDE USING gist (mesa_id WITH =, periodo WITH &&) WHERE (bloqueante)
+);
+CREATE INDEX ON reservas_mesas (reserva_id);
+CREATE INDEX ON reservas_mesas USING gist (mesa_id, periodo) WHERE bloqueante;
+
+-- Mesa fuera de servicio: mantenimiento, evento privado. Ocupa como cualquier
+-- otra cosa, por la misma constraint.
+CREATE TABLE bloqueos (
+  id        uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  tenant_id uuid NOT NULL REFERENCES tenants(id) ON DELETE CASCADE,
+  mesa_id   uuid NOT NULL REFERENCES mesas(id) ON DELETE CASCADE,
+  periodo   tstzrange NOT NULL,
+  motivo    text NOT NULL,
+  creado_en timestamptz NOT NULL DEFAULT now()
+);
+CREATE INDEX ON bloqueos USING gist (mesa_id, periodo);
+
+-- Append-only: es la fuente de verdad de la historia, no un log de conveniencia.
+CREATE TABLE reservas_eventos (
+  id             bigserial PRIMARY KEY,
+  tenant_id      uuid NOT NULL REFERENCES tenants(id) ON DELETE CASCADE,
+  reserva_id     uuid NOT NULL REFERENCES reservas(id) ON DELETE CASCADE,
+  tipo           text NOT NULL,
+  actor_tipo     text NOT NULL CHECK (actor_tipo IN (
+                   'cliente', 'staff', 'sistema', 'admin_plataforma')),
+  actor_id       uuid,
+  correlacion_id uuid,   -- vincula los dos eventos de un intercambio de mesas
+  datos          jsonb NOT NULL DEFAULT '{}'::jsonb,   -- { antes, despues, motivo }
+  en             timestamptz NOT NULL DEFAULT now()
+);
+CREATE INDEX ON reservas_eventos (tenant_id, reserva_id, en);
+
+-- El "por qué" de cada decisión del motor. Guardar los descartados con su motivo
+-- es lo que permite responder "¿por qué me dijo que no había lugar si la mesa 7
+-- estaba vacía?" sin una sesión de debugging a ciegas.
+CREATE TABLE asignaciones_log (
+  id                bigserial PRIMARY KEY,
+  tenant_id         uuid NOT NULL REFERENCES tenants(id) ON DELETE CASCADE,
+  reserva_id        uuid REFERENCES reservas(id) ON DELETE CASCADE,
+  version_algoritmo text NOT NULL,
+  explicacion       jsonb NOT NULL,
+  en                timestamptz NOT NULL DEFAULT now()
+);
+CREATE INDEX ON asignaciones_log (tenant_id, en);
+
+-- ---------------------------------------------------------------------------
+-- Sincronización estado de reserva -> bloqueante del inventario
+-- ---------------------------------------------------------------------------
+-- 'finalizada' SIGUE bloqueando: si la mesa se liberó antes, lo que corresponde
+-- es achicar el periodo (y esos minutos vuelven al inventario), no borrar el
+-- hecho de que estuvo ocupada.
+CREATE OR REPLACE FUNCTION estado_bloquea(p_estado text) RETURNS boolean
+  LANGUAGE sql IMMUTABLE AS $$
+  SELECT p_estado IN ('confirmada', 'sentada', 'hold', 'en_riesgo', 'finalizada');
+$$;
+
+CREATE OR REPLACE FUNCTION sync_bloqueante() RETURNS trigger
+  LANGUAGE plpgsql AS $$
+BEGIN
+  UPDATE reservas_mesas
+     SET bloqueante = estado_bloquea(NEW.estado)
+   WHERE reserva_id = NEW.id
+     AND bloqueante IS DISTINCT FROM estado_bloquea(NEW.estado);
+  RETURN NEW;
+END $$;
+
+CREATE TRIGGER reservas_sync_bloqueante
+  AFTER UPDATE OF estado ON reservas
+  FOR EACH ROW WHEN (OLD.estado IS DISTINCT FROM NEW.estado)
+  EXECUTE FUNCTION sync_bloqueante();
+
+-- Al insertar, el inventario hereda el estado de su reserva: la app no puede
+-- olvidarse de setearlo.
+CREATE OR REPLACE FUNCTION set_bloqueante_inicial() RETURNS trigger
+  LANGUAGE plpgsql AS $$
+BEGIN
+  SELECT estado_bloquea(estado) INTO NEW.bloqueante FROM reservas WHERE id = NEW.reserva_id;
+  RETURN NEW;
+END $$;
+
+CREATE TRIGGER reservas_mesas_bloqueante_inicial
+  BEFORE INSERT ON reservas_mesas
+  FOR EACH ROW EXECUTE FUNCTION set_bloqueante_inicial();
+
+-- ---------------------------------------------------------------------------
+-- Row Level Security
+-- ---------------------------------------------------------------------------
+-- El bug clásico de este modelo es una consulta a la que se le olvidó el
+-- WHERE tenant_id. Con RLS esa consulta devuelve cero filas en vez de datos
+-- ajenos: el bug pasa de incidente de privacidad a página vacía.
+CREATE OR REPLACE FUNCTION tenant_actual() RETURNS uuid
+  LANGUAGE sql STABLE AS $$
+  SELECT nullif(current_setting('app.tenant_id', true), '')::uuid;
+$$;
+
+DO $$
+DECLARE t text;
+BEGIN
+  FOREACH t IN ARRAY ARRAY[
+    'tenant_dominios', 'tenant_canales_whatsapp', 'usuarios_tenants',
+    'salones', 'mesas', 'combinaciones_vetadas', 'franjas_servicio',
+    'duraciones_turno', 'excepciones_calendario', 'clientes', 'reservas',
+    'reservas_mesas', 'bloqueos', 'reservas_eventos', 'asignaciones_log'
+  ] LOOP
+    EXECUTE format('ALTER TABLE %I ENABLE ROW LEVEL SECURITY', t);
+    EXECUTE format('ALTER TABLE %I FORCE ROW LEVEL SECURITY', t);
+    EXECUTE format(
+      'CREATE POLICY %I ON %I USING (tenant_id = tenant_actual())
+                                WITH CHECK (tenant_id = tenant_actual())',
+      t || '_aislamiento', t);
+    EXECUTE format('GRANT SELECT, INSERT, UPDATE, DELETE ON %I TO resto_app', t);
+  END LOOP;
+END $$;
+
+-- El propio tenant solo se ve a sí mismo.
+ALTER TABLE tenants ENABLE ROW LEVEL SECURITY;
+ALTER TABLE tenants FORCE ROW LEVEL SECURITY;
+CREATE POLICY tenants_aislamiento ON tenants USING (id = tenant_actual());
+GRANT SELECT, UPDATE ON tenants TO resto_app;
+
+-- Los usuarios se filtran por su pertenencia al tenant activo, no por tenant_id.
+ALTER TABLE usuarios ENABLE ROW LEVEL SECURITY;
+ALTER TABLE usuarios FORCE ROW LEVEL SECURITY;
+CREATE POLICY usuarios_aislamiento ON usuarios USING (
+  EXISTS (SELECT 1 FROM usuarios_tenants ut
+           WHERE ut.usuario_id = usuarios.id AND ut.tenant_id = tenant_actual())
+);
+GRANT SELECT, INSERT, UPDATE ON usuarios TO resto_app;
+
+GRANT USAGE ON SCHEMA public TO resto_app;
+GRANT USAGE, SELECT ON ALL SEQUENCES IN SCHEMA public TO resto_app;
