@@ -1,6 +1,6 @@
 import type pg from 'pg';
 import { conTenant } from '../datos/conexion';
-import { derivarCandidatos, type Candidato } from '../dominio/combinaciones';
+import { compararNatural, derivarCandidatos, type Candidato } from '../dominio/combinaciones';
 import { CONFIG_POR_DEFECTO, type ConfigAsignacion, type Mesa } from '../dominio/tipos';
 import {
   cargarConfigAsignacion,
@@ -97,12 +97,15 @@ export async function cargarPlanoCompleto(
           distanciaCm: Math.round(c.distanciaCm),
           mesas: c.mesas.map((m) => m.id),
         })),
-      vetadas: vetados.map(([a, b]) => ({
-        mesaA: a,
-        mesaB: b,
-        nombreA: nombrePorMesa.get(a) ?? '?',
-        nombreB: nombrePorMesa.get(b) ?? '?',
-      })),
+      // El par se guarda ordenado por id, que no significa nada para quien lo lee.
+      // Se muestra por nombre: "1 + 2", nunca "2 + 1".
+      vetadas: vetados.map(([a, b]) => {
+        const nombreA = nombrePorMesa.get(a) ?? '?';
+        const nombreB = nombrePorMesa.get(b) ?? '?';
+        return compararNatural(nombreA, nombreB) <= 0
+          ? { mesaA: a, mesaB: b, nombreA, nombreB }
+          : { mesaA: b, mesaB: a, nombreA: nombreB, nombreB: nombreA };
+      }),
     };
   });
 }
