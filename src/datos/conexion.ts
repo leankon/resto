@@ -15,12 +15,31 @@ export const URL_APP =
 export const URL_AUTH =
   process.env['DATABASE_URL_AUTH'] ?? 'postgres://resto_auth:dev@localhost:5433/resto';
 
-/** Solo para migraciones y para el panel de super-admin. */
+/**
+ * Rol del super-admin: da de alta locales, que es la única operación que por
+ * definición no ocurre dentro de ningún tenant.
+ *
+ * No es superusuario ni tiene BYPASSRLS. Su acceso ampliado sale de políticas
+ * apuntadas al rol, porque en Postgres gestionado (Supabase, Neon, RDS) nadie es
+ * superusuario de verdad y un esquema que dependa de eso no se puede desplegar.
+ */
 export const URL_ADMIN =
-  process.env['DATABASE_URL_ADMIN'] ?? 'postgres://postgres@localhost:5433/resto';
+  process.env['DATABASE_URL_ADMIN'] ?? 'postgres://resto_admin:dev@localhost:5433/resto';
+
+/**
+ * Postgres gestionado exige TLS. `pg` no lo activa por leer `sslmode` en la URL, así
+ * que se decide acá: fuera de localhost, siempre cifrado.
+ */
+function configuracionSsl(url: string): pg.PoolConfig['ssl'] {
+  const esLocal = /@(localhost|127\.0\.0\.1)[:/]/.test(url);
+  if (esLocal || process.env['DATABASE_SSL'] === 'off') return false;
+  // Los poolers de Supabase y Neon presentan certificados que la cadena por defecto
+  // de Node no valida. El tráfico va cifrado igual.
+  return { rejectUnauthorized: false };
+}
 
 export function pool(url = URL_APP): pg.Pool {
-  return new pg.Pool({ connectionString: url, max: 8 });
+  return new pg.Pool({ connectionString: url, max: 8, ssl: configuracionSsl(url) });
 }
 
 /**

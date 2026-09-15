@@ -14,14 +14,23 @@ CREATE EXTENSION IF NOT EXISTS pgcrypto;     -- gen_random_uuid()
 -- El superusuario IGNORA las políticas de RLS. Si la app se conecta como
 -- postgres, el aislamiento entre locales no existe y nadie se entera hasta que
 -- un local ve las reservas de otro. La app usa resto_app y nada más.
+--
+-- Ningún rol usa BYPASSRLS, y es a propósito: otorgarlo requiere ser superusuario
+-- de verdad, y en Postgres gestionado (Supabase, Neon, RDS) el rol con el que uno
+-- entra NO lo es. El acceso ampliado del super-admin se da con políticas apuntadas
+-- al rol (`TO resto_admin`), que es más preciso y además funciona en cualquier lado.
 DO $$
 BEGIN
   IF NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'resto_app') THEN
     CREATE ROLE resto_app LOGIN PASSWORD 'dev';
   END IF;
   IF NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'resto_admin') THEN
-    CREATE ROLE resto_admin LOGIN PASSWORD 'dev' BYPASSRLS;
+    CREATE ROLE resto_admin LOGIN PASSWORD 'dev';
   END IF;
+  -- Converge el estado en vez de solo crear: una base que ya tenía estos roles con
+  -- BYPASSRLS tiene que quedar igual que una recién creada.
+  ALTER ROLE resto_app NOBYPASSRLS NOSUPERUSER;
+  ALTER ROLE resto_admin NOBYPASSRLS NOSUPERUSER;
 END $$;
 
 -- ---------------------------------------------------------------------------
@@ -352,29 +361,43 @@ BEGIN
     'reservas_mesas', 'bloqueos', 'reservas_eventos', 'asignaciones_log'
   ] LOOP
     EXECUTE format('ALTER TABLE %I ENABLE ROW LEVEL SECURITY', t);
+    -- FORCE hace que la política valga incluso para el dueño de la tabla.
     EXECUTE format('ALTER TABLE %I FORCE ROW LEVEL SECURITY', t);
     EXECUTE format(
-      'CREATE POLICY %I ON %I USING (tenant_id = tenant_actual())
-                                WITH CHECK (tenant_id = tenant_actual())',
-      t || '_aislamiento', t);
-    EXECUTE format('GRANT SELECT, INSERT, UPDATE, DELETE ON %I TO resto_app', t);
+      'CREATE POLICY %I ON %I FOR ALL TO resto_app
+         USING (tenant_id = tenant_actual()) WITH CHECK (tenant_id = tenant_actual())',
+      t || '_app', t);
+    EXECUTE format(
+      'CREATE POLICY %I ON %I FOR ALL TO resto_admin USING (true) WITH CHECK (true)',
+      t || '_admin', t);
+    EXECUTE format('GRANT SELECT, INSERT, UPDATE, DELETE ON %I TO resto_app, resto_admin', t);
   END LOOP;
 END $$;
 
 -- El propio tenant solo se ve a sí mismo.
 ALTER TABLE tenants ENABLE ROW LEVEL SECURITY;
 ALTER TABLE tenants FORCE ROW LEVEL SECURITY;
-CREATE POLICY tenants_aislamiento ON tenants USING (id = tenant_actual());
+CREATE POLICY tenants_app ON tenants FOR ALL TO resto_app
+  USING (id = tenant_actual()) WITH CHECK (id = tenant_actual());
+CREATE POLICY tenants_admin ON tenants FOR ALL TO resto_admin
+  USING (true) WITH CHECK (true);
 GRANT SELECT, UPDATE ON tenants TO resto_app;
+GRANT SELECT, INSERT, UPDATE, DELETE ON tenants TO resto_admin;
 
 -- Los usuarios se filtran por su pertenencia al tenant activo, no por tenant_id.
 ALTER TABLE usuarios ENABLE ROW LEVEL SECURITY;
 ALTER TABLE usuarios FORCE ROW LEVEL SECURITY;
-CREATE POLICY usuarios_aislamiento ON usuarios USING (
+CREATE POLICY usuarios_app ON usuarios FOR ALL TO resto_app USING (
   EXISTS (SELECT 1 FROM usuarios_tenants ut
            WHERE ut.usuario_id = usuarios.id AND ut.tenant_id = tenant_actual())
 );
+CREATE POLICY usuarios_admin ON usuarios FOR ALL TO resto_admin
+  USING (true) WITH CHECK (true);
 GRANT SELECT, INSERT, UPDATE ON usuarios TO resto_app;
+GRANT SELECT, INSERT, UPDATE, DELETE ON usuarios TO resto_admin;
 
-GRANT USAGE ON SCHEMA public TO resto_app;
-GRANT USAGE, SELECT ON ALL SEQUENCES IN SCHEMA public TO resto_app;
+-- Dar de alta locales y admins de plataforma no ocurre dentro de ningún tenant.
+GRANT SELECT, INSERT, UPDATE, DELETE ON admins_plataforma TO resto_admin;
+
+GRANT USAGE ON SCHEMA public TO resto_app, resto_admin;
+GRANT USAGE, SELECT ON ALL SEQUENCES IN SCHEMA public TO resto_app, resto_admin;

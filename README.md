@@ -62,6 +62,7 @@ Leer en orden:
 | [03 — Modelo de datos y asignación](docs/03-modelo-de-datos-y-asignacion.md) | tablas, el motor de mesas, concurrencia, auditoría |
 | [04 — Notificaciones](docs/04-notificaciones.md) | motor multi-canal, resolución de canal, consentimiento, outbox |
 | [05 — Preguntas abiertas](docs/05-preguntas-abiertas.md) | lo que falta definir antes de la Fase 1 |
+| [06 — Cómo desplegar](docs/06-desplegar.md) | pasar de la máquina a internet: base, hosting y qué falta para producción |
 
 ## Resumen de decisiones propuestas
 

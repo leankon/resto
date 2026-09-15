@@ -241,10 +241,25 @@ describe('row level security', () => {
     expect(vistosPorA.rows).toHaveLength(1);
   });
 
-  it('el superusuario ignora RLS: por eso la app nunca se conecta así', async () => {
+  it('el super-admin ve todos los locales, por política explícita', async () => {
     await conTenant(app, tenantA, (c) => reservar(c, { tenantId: tenantA, mesaId: mesaA, clienteId: clienteA }));
     const { rows } = await admin.query('SELECT * FROM reservas');
     expect(rows.length).toBeGreaterThan(0);
+  });
+
+  it('ningún rol de la app es superusuario ni ignora RLS', async () => {
+    // Es lo que hace desplegable el esquema: en Postgres gestionado (Supabase, Neon,
+    // RDS) nadie es superusuario de verdad, así que un esquema que dependa de eso no
+    // se puede instalar. Y de paso, RLS no se puede saltear ni por accidente.
+    const { rows } = await admin.query(
+      `SELECT rolname, rolsuper, rolbypassrls FROM pg_roles WHERE rolname LIKE 'resto\\_%'`,
+    );
+    expect(rows.length).toBe(3);
+    for (const rol of rows) {
+      expect({ [rol.rolname]: [rol.rolsuper, rol.rolbypassrls] }).toEqual({
+        [rol.rolname]: [false, false],
+      });
+    }
   });
 });
 

@@ -1,7 +1,7 @@
 import { cookies } from 'next/headers';
 import { redirect } from 'next/navigation';
 import pg from 'pg';
-import { URL_ADMIN, URL_APP, URL_AUTH } from '../datos/conexion';
+import { URL_ADMIN, URL_APP, URL_AUTH, pool as crearPool } from '../datos/conexion';
 import { sesionActual, type Sesion } from '../servicios/auth';
 
 /**
@@ -13,7 +13,7 @@ import { sesionActual, type Sesion } from '../servicios/auth';
 const cache = globalThis as unknown as { __pools?: Record<string, pg.Pool> };
 function poolCacheado(nombre: string, url: string): pg.Pool {
   cache.__pools ??= {};
-  cache.__pools[nombre] ??= new pg.Pool({ connectionString: url, max: 10 });
+  cache.__pools[nombre] ??= crearPool(url);
   return cache.__pools[nombre]!;
 }
 
