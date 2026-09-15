@@ -1,17 +1,9 @@
 import Link from 'next/link';
 import { salir } from '../login/acciones';
 import { poolApp, requerirStaff } from '../../web/contexto';
-import {
-  CANALES,
-  ESTADOS,
-  fechaCorta,
-  hora as formatearHora,
-  hoyEn,
-  instanteLocal,
-  sumarDias,
-} from '../../web/formato';
+import { fechaCorta, hoyEn, instanteLocal, sumarDias } from '../../web/formato';
 import { estadoDelSalon, ingresosPorBloque, reservasDelDia } from '../../servicios/panel';
-import { marcarEstado } from './acciones';
+import Tabla from './tabla';
 
 type Parametros = Promise<{ fecha?: string; salon?: string; hora?: string }>;
 
@@ -97,64 +89,7 @@ export default async function Panel({ searchParams }: { searchParams: Parametros
 
         <section className="tarjeta">
           <h2>Reservas del día</h2>
-          {reservas.length === 0 ? (
-            <p className="vacio">Todavía no hay reservas para este día.</p>
-          ) : (
-            <table>
-              <thead>
-                <tr>
-                  <th>Hora</th><th>Quién</th><th>Personas</th><th>Mesa</th>
-                  <th>Estado</th><th>Canal</th><th />
-                </tr>
-              </thead>
-              <tbody>
-                {reservas.map((r) => {
-                  const cerrada = ['cancelada', 'no_show', 'finalizada'].includes(r.estado);
-                  return (
-                    <tr key={r.id} className={cerrada ? 'pasada' : undefined}>
-                      <td><strong>{formatearHora(r.inicio, tz)}</strong></td>
-                      <td>
-                        <Link href={`/panel/reserva/${r.id}`}>
-                          {r.cliente?.nombre ?? 'Sin reserva'}
-                        </Link>
-                        {r.cliente && r.cliente.visitas > 0 && (
-                          <div className="apagado">
-                            {r.cliente.visitas} {r.cliente.visitas === 1 ? 'visita' : 'visitas'}
-                            {r.cliente.noShows > 0 && ` · ${r.cliente.noShows} ausencias`}
-                          </div>
-                        )}
-                        {r.sinContacto && (
-                          <div className="pastilla alerta">no recibe avisos</div>
-                        )}
-                      </td>
-                      <td>{r.personas}</td>
-                      <td>{r.mesas.join(' + ') || '—'}</td>
-                      <td>
-                        <span className={`pastilla ${cerrada ? 'gris' : ''}`}>
-                          {ESTADOS[r.estado] ?? r.estado}
-                        </span>
-                      </td>
-                      <td className="apagado">{CANALES[r.canalOrigen] ?? r.canalOrigen}</td>
-                      <td>
-                        {!cerrada && (
-                          <div className="acciones">
-                            {r.estado !== 'sentada' && (
-                              <Boton reservaId={r.id} estado="sentada">Llegó</Boton>
-                            )}
-                            {r.estado === 'sentada' && (
-                              <Boton reservaId={r.id} estado="finalizada">Liberar</Boton>
-                            )}
-                            <Boton reservaId={r.id} estado="no_show" secundario>No vino</Boton>
-                            <Boton reservaId={r.id} estado="cancelada" secundario>Cancelar</Boton>
-                          </div>
-                        )}
-                      </td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
-          )}
+          <Tabla reservas={reservas} tz={tz} />
         </section>
 
         <section className="tarjeta">
@@ -200,24 +135,5 @@ export default async function Panel({ searchParams }: { searchParams: Parametros
         </section>
       </main>
     </>
-  );
-}
-
-function Boton({
-  reservaId, estado, children, secundario,
-}: {
-  reservaId: string;
-  estado: string;
-  children: React.ReactNode;
-  secundario?: boolean;
-}) {
-  return (
-    <form action={marcarEstado}>
-      <input type="hidden" name="reservaId" value={reservaId} />
-      <input type="hidden" name="estado" value={estado} />
-      <button className={`chico ${secundario ? 'secundario' : ''}`} type="submit">
-        {children}
-      </button>
-    </form>
   );
 }
