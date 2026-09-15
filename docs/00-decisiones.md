@@ -236,3 +236,37 @@ ahora casi nunca se llega a tocarla.
 **Consecuencia:** mover una reserva armada con varias mesas las mueve todas. Es lo
 correcto —una reserva de seis en dos mesas unidas no se parte en dos— y el cartel lo dice
 antes de que se confirme.
+
+## D15 — El día es el día de servicio, no el del almanaque
+
+Para un bar que cierra a las 02:00, la reserva de la 01:00 del domingo **es la noche del
+sábado**. El mozo que a esa hora sigue trabajando está haciendo el sábado, y su planilla
+tiene que decir lo mismo. Antes el sistema cortaba a la medianoche y partía la noche en
+dos planillas: la mitad de las mesas de un servicio aparecían en el día siguiente, donde
+no las miraba nadie.
+
+El corte **sale de las franjas**, no de un valor aparte: es la hora de cierre más tardía
+entre las franjas que cruzan medianoche. Un local que cierra a las 02:00 tiene corte 120;
+uno que cierra a las 23:00 tiene corte 0, y ahí día de servicio y día de almanaque son lo
+mismo. Si el local cambia su horario de cierre, el corte lo sigue solo.
+
+Todo lo que mira un día usa el mismo corte —la planilla, el gráfico de ingresos, las horas
+del plano, el alta de mostrador, el botón "volver al día"—. Si dos pantallas contaran el
+día distinto, la del sábado no cerraría con la del domingo y nadie sabría cuál creer.
+
+**Consecuencia menos obvia:** cargar una reserva "a la 01:00 del sábado" desde el panel
+guarda la 01:00 del **domingo**, que es cuando esa gente va a estar sentada. La fecha que
+elige el staff es el día de trabajo, no el que marca el reloj.
+
+## D16 — El plano se mira de a cuartos de hora
+
+El selector de hora del salón avanza de 15 en 15 minutos y no admite un valor intermedio:
+no se puede mirar el salón "a las 23:01". Dos personas mirando la misma pantalla tienen
+que estar viendo el mismo momento, y un minuto suelto no le sirve a nadie para decidir.
+
+Entre el almuerzo y la cena hay más de cuarenta cuartos de hora, así que la fila de
+botones se reemplazó por un desplegable con flechas a los costados. Las flechas son para
+el uso real —correrse un rato y ver qué pasa—; el desplegable, para saltar lejos.
+
+**Cargar una reserva a mano no tiene esa restricción.** El que llama por teléfono pide las
+21:10, y obligar al mozo a redondear lo hace perder la mesa o anotar una hora que no es.

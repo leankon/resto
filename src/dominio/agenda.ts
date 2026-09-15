@@ -79,45 +79,57 @@ export function horariosDelDia(
 }
 
 /**
- * Las horas a las que tiene sentido mirar el salón en una fecha del almanaque.
+ * Las horas a las que tiene sentido mirar el salón en un día de servicio.
  *
  * No es lo mismo que `horariosDelDia`. Ahí importa hasta cuándo se acepta que entre
  * gente; acá importa hasta cuándo hay gente sentada. Un local que toma el último
  * ingreso a las 01:00 y cierra a las 02:00 igual tiene mesas ocupadas a las 02:00, y el
  * encargado necesita poder mirarlas.
  *
- * Devuelve horas de reloj de ESA fecha, entre 00:00 y 23:59, porque es lo que hace la
- * planilla del día: la madrugada del domingo aparece en la planilla del domingo. Por eso
- * se juntan dos cosas —lo que abre ese día, y la cola de la noche anterior que termina
- * después de las doce—, y la cena que cruza medianoche se corta a la medianoche.
+ * Son horas del DÍA DE SERVICIO, igual que la planilla: la madrugada del domingo forma
+ * parte del sábado y va al final de la lista del sábado, no al principio de la del
+ * domingo. Por eso se devuelven ordenadas por el momento real y no por la etiqueta.
  */
 export function horasDeApertura(
   fecha: string,
   config: ConfigTurnos,
-  paso: Minutos = 60,
+  paso: Minutos = 15,
 ): string[] {
   const dia = diaSemanaDe(fecha);
-  const ayer = ((dia + 6) % 7) as ReturnType<typeof diaSemanaDe>;
   const minutos = new Set<number>();
 
-  const agregar = (desde: number, hasta: number) => {
-    for (let m = Math.ceil(desde / paso) * paso; m <= hasta; m += paso) minutos.add(m);
-    // Los bordes entran siempre, aunque no caigan en el paso: si el local abre 19:30,
-    // la primera hora para mirar es 19:30 y no 20:00.
-    minutos.add(desde);
-    minutos.add(hasta);
-  };
-
   for (const franja of config.franjas) {
+    if (!franja.dias.includes(dia)) continue;
     const desde = aMinutos(franja.desde);
     const cierre = aMinutos(franja.hasta);
-    const cruza = cierre <= desde;
+    // Cierra a una hora menor o igual a la de apertura: cruza la medianoche, y esos
+    // minutos siguen contando en este día de servicio.
+    const hasta = cierre <= desde ? cierre + 1440 : cierre;
 
-    // Lo que abre este día, hasta la medianoche como mucho.
-    if (franja.dias.includes(dia)) agregar(desde, cruza ? 1440 : cierre);
-    // Y la cola de la noche de ayer, que en el reloj ya es este día.
-    if (cruza && franja.dias.includes(ayer)) agregar(0, cierre);
+    for (let m = Math.ceil(desde / paso) * paso; m <= hasta; m += paso) minutos.add(m);
+    // Los bordes entran siempre, aunque no caigan en el paso: si el local abre 19:35,
+    // la primera hora para mirar es 19:35 y no 19:45.
+    minutos.add(desde);
+    minutos.add(hasta);
   }
 
   return [...minutos].sort((a, b) => a - b).map(aHHMM);
+}
+
+/**
+ * El instante real detrás de una hora del plano.
+ *
+ * "01:00 del sábado" es, en el reloj, la 01:00 del domingo. Sin esta cuenta, mirar el
+ * salón a la 01:00 muestra la madrugada equivocada: la de veinticuatro horas antes.
+ */
+export function instanteDeServicio(
+  fecha: string,
+  hora: string,
+  tz: string,
+  corteMin: Minutos,
+): Date {
+  // El corte entra: a las 02:00 de un local que cierra a las 02:00 todavía se está
+  // mirando la noche anterior, que es el momento en que se van los últimos.
+  const esMadrugada = corteMin > 0 && aMinutos(hora) <= corteMin;
+  return instanteLocal(esMadrugada ? sumarDias(fecha, 1) : fecha, hora, tz);
 }

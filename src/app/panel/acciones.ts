@@ -2,7 +2,8 @@
 
 import { revalidatePath } from 'next/cache';
 import { actorDe, poolApp, requerirStaff } from '../../web/contexto';
-import { instanteLocal } from '../../web/formato';
+import { instanteDeServicio } from '../../dominio/agenda';
+import { corteDelLocal } from '../../servicios/panel';
 import {
   cambiarEstado,
   crearReserva,
@@ -111,9 +112,13 @@ export async function nuevaReserva(
     return { error: 'Faltan la fecha, la hora o el nombre.', valores };
   }
 
+  // La hora se interpreta contra el día de SERVICIO, igual que la planilla: cargar una
+  // reserva "a la 01:00 del sábado" tiene que caer en la madrugada del domingo, que es
+  // cuando esa gente va a estar sentada.
+  const corte = await corteDelLocal(poolApp(), ctx.tenantId);
   const resultado = await crearReserva(poolApp(), {
     tenantId: ctx.tenantId,
-    inicio: instanteLocal(fecha, hora, ctx.tenant.tz),
+    inicio: instanteDeServicio(fecha, hora, ctx.tenant.tz, corte),
     personas: Number(datos.get('personas') ?? 2),
     canalOrigen: 'manual',
     contacto: {

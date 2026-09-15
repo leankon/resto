@@ -2,7 +2,13 @@ import Link from 'next/link';
 import { notFound } from 'next/navigation';
 import { poolApp, requerirStaff } from '../../../../web/contexto';
 import { CANALES, ESTADOS, fechaCorta, hora } from '../../../../web/formato';
-import { estadoDelSalon, historial, reservaPorId } from '../../../../servicios/panel';
+import {
+  corteDelLocal,
+  estadoDelSalon,
+  historial,
+  reservaPorId,
+} from '../../../../servicios/panel';
+import { fechaDeServicio } from '../../../../dominio/tiempo';
 import { telefonoLegible } from '../../../../dominio/clientes';
 import Mover from './mover';
 
@@ -29,11 +35,11 @@ export default async function DetalleReserva({ params }: { params: Promise<{ id:
   ]);
   if (!reserva) notFound();
 
-  // El día al que pertenece la reserva en hora local: el botón "volver" tiene que
-  // llevar a la planilla donde está, no a la de hoy.
-  const fecha = new Intl.DateTimeFormat('en-CA', {
-    timeZone: tz, year: 'numeric', month: '2-digit', day: '2-digit',
-  }).format(reserva.inicio);
+  // El día de servicio al que pertenece la reserva: el botón "volver" tiene que llevar
+  // a la planilla donde está. Para una reserva de la 01:00, esa planilla es la de la
+  // noche anterior, no la del día que marca el reloj.
+  const corte = await corteDelLocal(poolApp(), ctx.tenantId);
+  const fecha = fechaDeServicio(reserva.inicio, tz, corte);
 
   const salones = await estadoDelSalon(poolApp(), ctx.tenantId, reserva.inicio);
 

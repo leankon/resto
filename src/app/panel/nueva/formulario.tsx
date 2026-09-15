@@ -3,13 +3,6 @@
 import { useActionState } from 'react';
 import { nuevaReserva } from '../acciones';
 
-/** Horarios en punto y cuartos: el cliente reserva sobre la grilla de 15 minutos (D8). */
-const HORARIOS = Array.from({ length: 4 * 24 }, (_, i) => {
-  const h = String(Math.floor(i / 4)).padStart(2, '0');
-  const m = String((i % 4) * 15).padStart(2, '0');
-  return `${h}:${m}`;
-});
-
 export default function Formulario({ fecha }: { fecha: string }) {
   const [respuesta, enviar, enviando] = useActionState(nuevaReserva, null);
   const v = respuesta?.valores;
@@ -44,11 +37,9 @@ export default function Formulario({ fecha }: { fecha: string }) {
         </label>
         <label>
           Hora
-          <select name="hora" defaultValue={v?.hora || '21:00'} required>
-            {HORARIOS.map((h) => (
-              <option key={h} value={h}>{h}</option>
-            ))}
-          </select>
+          {/* Cualquier minuto, no la grilla: el que llama por teléfono pide las 21:10
+              y obligar al mozo a redondear le hace perder la mesa o mentir la hora. */}
+          <input type="time" name="hora" defaultValue={v?.hora || '21:00'} required />
         </label>
         <label>
           Personas

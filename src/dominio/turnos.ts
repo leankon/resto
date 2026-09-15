@@ -1,5 +1,5 @@
 import type { DiaSemana, FranjaServicio, Id, Minutos, ReglaDuracion } from './tipos';
-import { aMinutos, fechaLocal, horaLocal } from './tiempo';
+import { aMinutos, fechaDeServicio, fechaLocal, horaLocal } from './tiempo';
 
 /**
  * Un día que se sale de la rutina: un feriado cerrado, un evento privado, o un día con
@@ -165,4 +165,36 @@ export function reglasSembradas(
     });
   }
   return reglas;
+}
+
+/**
+ * A qué hora del reloj termina el día de trabajo del local, en minutos desde la
+ * medianoche. Es el corte entre un día de servicio y el siguiente.
+ *
+ * Un bar que cierra a las 02:00 devuelve 120: todo lo que pasa antes de las 02:00
+ * pertenece a la noche anterior. El mozo que a la 01:00 sigue laburando está trabajando
+ * el sábado, no el domingo, y su planilla tiene que decir lo mismo.
+ *
+ * Sale de las franjas y no de un valor aparte: si el local cambia el horario de cierre,
+ * el corte lo sigue solo. Un local que cierra antes de medianoche devuelve 0, y ahí día
+ * de servicio y día de almanaque son lo mismo.
+ */
+export function corteDelDia(config: ConfigTurnos): Minutos {
+  let corte = 0;
+  for (const franja of config.franjas) {
+    if (!cruzaMedianoche(franja)) continue;
+    corte = Math.max(corte, aMinutos(franja.hasta));
+  }
+  return corte;
+}
+
+/**
+ * El día de servicio al que pertenece un instante: YYYY-MM-DD en hora del local.
+ *
+ * Correr el reloj hacia atrás hasta el corte y recién ahí mirar la fecha. Con cierre a
+ * las 02:00, la reserva de la 01:00 del domingo se convierte en las 23:00 del sábado y
+ * cae, como corresponde, en la planilla del sábado.
+ */
+export function diaDeServicio(inicio: Date, config: ConfigTurnos): string {
+  return fechaDeServicio(inicio, config.tz, corteDelDia(config));
 }

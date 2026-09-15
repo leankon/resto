@@ -1,7 +1,9 @@
 import Link from 'next/link';
 import { salir } from '../login/acciones';
 import { poolApp, requerirStaff } from '../../web/contexto';
-import { fechaCorta, hora as horaDe, hoyEn, instanteLocal, sumarDias } from '../../web/formato';
+import { fechaCorta, hora as horaDe, hoyEn, sumarDias } from '../../web/formato';
+import { instanteDeServicio } from '../../dominio/agenda';
+import { fechaDeServicio } from '../../dominio/tiempo';
 import {
   estadoDelSalon,
   horasDelPlano,
@@ -26,21 +28,22 @@ export default async function Panel({ searchParams }: { searchParams: Parametros
   const fecha = /^\d{4}-\d{2}-\d{2}$/.test(fechaCruda ?? '') ? fechaCruda! : hoyEn(tz);
   const horaPedida = /^\d{2}:\d{2}$/.test(horaCruda ?? '') ? horaCruda! : null;
 
-  const [reservas, ingresos, horasPosibles] = await Promise.all([
+  const [reservas, ingresos, plano] = await Promise.all([
     reservasDelDia(poolApp(), ctx.tenantId, fecha),
     ingresosPorBloque(poolApp(), ctx.tenantId, fecha),
     horasDelPlano(poolApp(), ctx.tenantId, fecha),
   ]);
+  const { horas: horasPosibles, corteMin } = plano;
 
   // La hora que se mira por defecto: si el día es hoy y el local está abierto, ahora
   // mismo. Si no, la primera reserva del día, que es lo que alguien quiere ver cuando
   // abre la planilla de mañana. Antes era siempre 21:00, que para un local que abre a
   // las 20:00 mostraba el salón vacío.
-  const horaPlano = horaPedida ?? horaPorDefecto(fecha, tz, horasPosibles, reservas);
+  const horaPlano = horaPedida ?? horaPorDefecto(fecha, tz, horasPosibles, reservas, corteMin);
   const salones = await estadoDelSalon(
     poolApp(),
     ctx.tenantId,
-    instanteLocal(fecha, horaPlano, tz),
+    instanteDeServicio(fecha, horaPlano, tz, corteMin),
   );
 
   const salonActivo = salones.find((s) => s.id === salonPedido) ?? salones[0];
@@ -144,26 +147,42 @@ export default async function Panel({ searchParams }: { searchParams: Parametros
                 </Link>
               ))}
             </div>
-            <div className="solapas" style={{ margin: 0, flex: '0 0 auto' }}>
-              {/* La hora elegida siempre aparece, aunque sea una que no está en la
-                  grilla: si no, el botón marcado no existe y parece que no pasó nada. */}
-              {[...new Set([...horasPosibles, horaPlano])].sort().map((h) => (
-                <Link key={h} href={link({ hora: h })} aria-current={h === horaPlano ? 'page' : undefined}>
-                  {h}
-                </Link>
-              ))}
-              <form method="get" action="/panel" style={{ display: 'flex', gap: 4 }}>
+            {/* Un desplegable y no una fila de botones: entre el almuerzo y la cena
+                hay más de cuarenta cuartos de hora, y cuarenta botones no se leen.
+                Las flechas son para el uso real, que es correrse un rato. */}
+            <div className="reloj" style={{ flex: '0 0 auto' }}>
+              <Link
+                className="boton secundario chico"
+                href={link({ hora: horaVecina(horasPosibles, horaPlano, -1) })}
+                aria-label="Un cuarto de hora antes"
+              >
+                ←
+              </Link>
+              <form method="get" action="/panel">
                 <input type="hidden" name="fecha" value={fecha} />
                 {salonActivo && <input type="hidden" name="salon" value={salonActivo.id} />}
-                <input
-                  type="time"
+                {/* La `key` no es decorativa: al navegar con las flechas, Next reusa
+                    el mismo nodo y `defaultValue` solo se aplica al montarlo. Sin esto
+                    la URL cambia a 21:15 y el desplegable se queda en 21:00. */}
+                <select
+                  key={horaPlano}
                   name="hora"
                   defaultValue={horaPlano}
-                  aria-label="Ver el salón a otra hora"
-                  style={{ width: 118, marginTop: 0 }}
-                />
+                  aria-label="Hora del salón"
+                >
+                  {[...new Set([horaPlano, ...horasPosibles])].map((h) => (
+                    <option key={h} value={h}>{h}</option>
+                  ))}
+                </select>
                 <button type="submit" className="secundario chico">Ver</button>
               </form>
+              <Link
+                className="boton secundario chico"
+                href={link({ hora: horaVecina(horasPosibles, horaPlano, 1) })}
+                aria-label="Un cuarto de hora después"
+              >
+                →
+              </Link>
             </div>
           </div>
 
@@ -192,15 +211,51 @@ function horaPorDefecto(
   tz: string,
   horasPosibles: string[],
   reservas: ReservaDelDia[],
+  corteMin: number,
 ): string {
-  if (fecha === hoyEn(tz)) {
-    const ahora = horaDe(new Date(), tz);
-    // Solo si el local está abierto: a las 9 de la mañana el salón vacío no dice nada.
-    if (horasPosibles.length > 0 && ahora >= horasPosibles[0]! && ahora <= horasPosibles.at(-1)!) {
-      return ahora;
-    }
+  // Estando en horario de servicio, lo que se quiere ver es el salón ahora. El corte
+  // hace que a la 01:00 del domingo esto siga siendo la planilla del sábado.
+  const ahora = new Date();
+  if (fecha === fechaDeServicio(ahora, tz, corteMin)) {
+    const reloj = laDeAntes(horasPosibles, fecha, tz, corteMin, ahora);
+    if (reloj) return reloj;
   }
   const primera = reservas.find((r) => !['cancelada', 'no_show'].includes(r.estado));
-  if (primera) return horaDe(primera.inicio, tz);
+  if (primera) {
+    return (
+      laDeAntes(horasPosibles, fecha, tz, corteMin, primera.inicio) ??
+      horaDe(primera.inicio, tz)
+    );
+  }
   return horasPosibles[0] ?? '21:00';
+}
+
+/**
+ * La hora de la grilla inmediatamente anterior a un momento.
+ *
+ * Se comparan instantes y no etiquetas: ordenadas como texto, la 01:00 de la madrugada
+ * parece anterior a las 12:00 del mediodía, y a las 21:37 el plano abriría mostrando la
+ * madrugada. La lista viene ordenada por momento real, así que alcanza con cortar en el
+ * primero que se pasa.
+ */
+function laDeAntes(
+  horasPosibles: string[],
+  fecha: string,
+  tz: string,
+  corteMin: number,
+  momento: Date,
+): string | null {
+  let elegida: string | null = null;
+  for (const h of horasPosibles) {
+    if (instanteDeServicio(fecha, h, tz, corteMin) > momento) break;
+    elegida = h;
+  }
+  return elegida;
+}
+
+/** La hora de al lado en la grilla, para las flechas. */
+function horaVecina(horasPosibles: string[], actual: string, paso: 1 | -1): string {
+  const i = horasPosibles.indexOf(actual);
+  if (i === -1) return horasPosibles[0] ?? actual;
+  return horasPosibles[Math.min(Math.max(i + paso, 0), horasPosibles.length - 1)] ?? actual;
 }

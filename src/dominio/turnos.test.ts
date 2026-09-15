@@ -1,6 +1,12 @@
 import { describe, expect, it } from 'vitest';
 import { ALMUERZO, CENA, TZ, local } from './fixtures';
-import { reglasSembradas, resolverTurno, type ConfigTurnos } from './turnos';
+import {
+  corteDelDia,
+  diaDeServicio,
+  reglasSembradas,
+  resolverTurno,
+  type ConfigTurnos,
+} from './turnos';
 
 const config: ConfigTurnos = {
   tz: TZ,
@@ -106,5 +112,40 @@ describe('excepciones del calendario', () => {
   it('un día sin excepción se comporta como siempre', () => {
     expect(resolverTurno(local('2026-09-15T21:00'), 2, { ...config, excepciones: [] }))
       .toMatchObject({ tipo: 'ok' });
+  });
+});
+
+describe('el día de servicio', () => {
+  it('el corte lo marca la franja que cierra más tarde', () => {
+    expect(corteDelDia(config)).toBe(120); // la cena cierra a las 02:00
+  });
+
+  it('un local que cierra antes de medianoche no tiene corte', () => {
+    const temprano = { ...config, franjas: [ALMUERZO] };
+    expect(corteDelDia(temprano)).toBe(0);
+  });
+
+  it('la reserva de la 01:00 del miércoles es la noche del martes', () => {
+    // Es el punto entero: el mozo que a la 01:00 sigue laburando está trabajando el
+    // martes, y su planilla tiene que decir lo mismo.
+    expect(diaDeServicio(local('2026-09-16T01:00'), config)).toBe('2026-09-15');
+  });
+
+  it('la cena de las 21:00 es del día en que empieza', () => {
+    expect(diaDeServicio(local('2026-09-15T21:00'), config)).toBe('2026-09-15');
+  });
+
+  it('el almuerzo del día siguiente ya es el día siguiente', () => {
+    expect(diaDeServicio(local('2026-09-16T13:00'), config)).toBe('2026-09-16');
+  });
+
+  it('pasado el cierre, la madrugada ya pertenece al día nuevo', () => {
+    // A las 03:00 el local está cerrado hace una hora: eso ya es el miércoles.
+    expect(diaDeServicio(local('2026-09-16T03:00'), config)).toBe('2026-09-16');
+  });
+
+  it('sin franjas que crucen medianoche, día de servicio y de almanaque coinciden', () => {
+    const temprano = { ...config, franjas: [ALMUERZO] };
+    expect(diaDeServicio(local('2026-09-16T01:00'), temprano)).toBe('2026-09-16');
   });
 });

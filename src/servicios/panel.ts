@@ -2,6 +2,7 @@ import type pg from 'pg';
 import { conTenant } from '../datos/conexion';
 import type { FormaMesa } from '../dominio/tipos';
 import { horasDeApertura } from '../dominio/agenda';
+import { corteDelDia } from '../dominio/turnos';
 import { cargarConfigTurnos, cargarTenant } from '../datos/repositorios';
 
 export interface ReservaDelDia {
@@ -27,16 +28,27 @@ export interface ReservaDelDia {
 }
 
 /**
+ * El corte entre un día de trabajo y el siguiente, en minutos desde la medianoche.
+ *
+ * Todo lo que mira un día —la planilla, el gráfico de ingresos, las horas del plano—
+ * tiene que usar el mismo corte, o cada pantalla cuenta un día distinto y la del sábado
+ * no cierra con la del domingo.
+ */
+async function corteDe(c: pg.PoolClient, tenantId: string): Promise<number> {
+  const tenant = await cargarTenant(c, tenantId);
+  return corteDelDia(await cargarConfigTurnos(c, tenant));
+}
+
+/**
  * Reservas de un día, en la zona horaria del local.
  *
  * El día se calcula en hora local y no en UTC: en UTC, una reserva de las 22:00 en
  * Buenos Aires ya cae al día siguiente y la planilla del martes aparecería vacía.
  *
- * Agrupa por día de ALMANAQUE, no por día de servicio: la reserva de la 01:00 del
- * domingo sale en la planilla del domingo, aunque para el bar sea la noche del sábado.
- * Está pendiente decidir si conviene al revés —ver docs/05-preguntas-abiertas.md—; si
- * cambia, tiene que cambiar junto con `ingresosPorBloque` y con las horas del plano,
- * porque las tres tienen que contar el día igual.
+ * Agrupa por día de SERVICIO, no de almanaque: para un bar que cierra a las 02:00, la
+ * reserva de la 01:00 del domingo es la noche del sábado y sale en la planilla del
+ * sábado. Es lo que espera quien está trabajando: a la 01:00 sigue siendo "el sábado"
+ * hasta que el local cierra. El corte sale del horario del local (D15).
  */
 export async function reservasDelDia(
   pool: pg.Pool,
@@ -44,6 +56,7 @@ export async function reservasDelDia(
   fecha: string,
 ): Promise<ReservaDelDia[]> {
   return conTenant(pool, tenantId, async (c) => {
+    const corte = await corteDe(c, tenantId);
     const { rows } = await c.query(
       `WITH tz AS (SELECT tz FROM tenants WHERE id = $1)
        SELECT r.id, r.inicio, r.personas, r.estado, r.canal_origen, r.notas,
@@ -61,9 +74,9 @@ export async function reservasDelDia(
          LEFT JOIN clientes cl ON cl.id = r.cliente_id
          CROSS JOIN tz
         WHERE r.tenant_id = $1
-          AND (r.inicio AT TIME ZONE tz.tz)::date = $2::date
+          AND ((r.inicio AT TIME ZONE tz.tz) - make_interval(mins => $3))::date = $2::date
         ORDER BY r.inicio, mesas`,
-      [tenantId, fecha],
+      [tenantId, fecha, corte],
     );
 
     return rows.map((f) => ({
@@ -160,23 +173,44 @@ export async function ingresosPorBloque(
   fecha: string,
 ): Promise<BloqueDeOcupacion[]> {
   return conTenant(pool, tenantId, async (c) => {
+    const corte = await corteDe(c, tenantId);
     const { rows } = await c.query(
-      `WITH tz AS (SELECT tz FROM tenants WHERE id = $1)
+      // Se ordena por la hora corrida al corte y no por la etiqueta: si no, la
+      // medianoche manda el bloque de las 00:15 al principio del gráfico, antes de la
+      // apertura, y el pico de la noche se lee al revés.
+      `WITH tz AS (SELECT tz FROM tenants WHERE id = $1),
+            base AS (
+              SELECT (r.inicio AT TIME ZONE tz.tz) AS reloj,
+                     (r.inicio AT TIME ZONE tz.tz) - make_interval(mins => $3) AS servicio,
+                     r.personas
+                FROM reservas r CROSS JOIN tz
+               WHERE r.tenant_id = $1
+                 AND ((r.inicio AT TIME ZONE tz.tz) - make_interval(mins => $3))::date
+                     = $2::date
+                 AND r.estado NOT IN ('cancelada', 'no_show')
+            )
        SELECT to_char(
-                date_trunc('hour', r.inicio AT TIME ZONE tz.tz)
-                  + interval '15 min' * floor(extract(minute FROM r.inicio AT TIME ZONE tz.tz) / 15),
+                date_trunc('hour', reloj)
+                  + interval '15 min' * floor(extract(minute FROM reloj) / 15),
                 'HH24:MI') AS hora,
-              sum(r.personas)::int AS personas,
+              sum(personas)::int AS personas,
               count(*)::int AS reservas
-         FROM reservas r CROSS JOIN tz
-        WHERE r.tenant_id = $1
-          AND (r.inicio AT TIME ZONE tz.tz)::date = $2::date
-          AND r.estado NOT IN ('cancelada', 'no_show')
-        GROUP BY 1 ORDER BY 1`,
-      [tenantId, fecha],
+         FROM base
+        GROUP BY 1 ORDER BY min(servicio)`,
+      [tenantId, fecha, corte],
     );
     return rows.map((f) => ({ hora: f.hora, personas: f.personas, reservas: f.reservas }));
   });
+}
+
+/**
+ * El corte entre días de trabajo de este local, en minutos desde la medianoche.
+ *
+ * Lo necesita cualquier pantalla que traduzca "tal hora de tal día" a un momento real:
+ * la 01:00 del sábado es, en el reloj, la 01:00 del domingo.
+ */
+export async function corteDelLocal(pool: pg.Pool, tenantId: string): Promise<number> {
+  return conTenant(pool, tenantId, (c) => corteDe(c, tenantId));
 }
 
 export interface MesaEnPlano {
@@ -339,9 +373,12 @@ export async function horasDelPlano(
   pool: pg.Pool,
   tenantId: string,
   fecha: string,
-): Promise<string[]> {
+): Promise<{ horas: string[]; corteMin: number }> {
   return conTenant(pool, tenantId, async (c) => {
     const tenant = await cargarTenant(c, tenantId);
-    return horasDeApertura(fecha, await cargarConfigTurnos(c, tenant));
+    const config = await cargarConfigTurnos(c, tenant);
+    // El corte viaja con las horas: sin él, la pantalla no sabe que la 01:00 de este
+    // día de servicio es, en el reloj, la 01:00 del día siguiente.
+    return { horas: horasDeApertura(fecha, config), corteMin: corteDelDia(config) };
   });
 }

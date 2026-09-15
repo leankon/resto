@@ -48,11 +48,10 @@ describe('reservasDelDia', () => {
     expect(dia[0]!.salon).toBe('Planta baja');
   });
 
-  it('la planilla se arma por día de almanaque en hora local', async () => {
-    // La de las 00:30 del 11 sale en la planilla del 11. Para el bar es la noche del
-    // 10, así que el criterio está para revisar; lo que este test fija es que el corte
-    // sea en hora local del local y no en UTC, donde una reserva de las 22:00 del 10
-    // ya contaría como del 11.
+  it('la reserva de la madrugada cae en la planilla de la noche anterior', async () => {
+    // El bar cierra a las 02:00. El mozo que a las 00:30 sigue laburando está
+    // trabajando el sábado, y su planilla tiene que decir lo mismo. Si esta reserva
+    // apareciera en la del domingo, el sábado a la noche no la ve nadie.
     await crearReserva(app, {
       tenantId: local.tenantId,
       inicio: new Date('2026-10-11T00:30:00-03:00'),
@@ -60,10 +59,29 @@ describe('reservasDelDia', () => {
       contacto: { nombre: 'Trasnochador', telefono: '1155551234' },
     });
 
-    // Sale en el día calendario local que corresponde, no en UTC (donde ya sería el 11).
-    const once = await reservasDelDia(app, local.tenantId, '2026-10-11');
-    expect(once).toHaveLength(1);
+    const delDiez = await reservasDelDia(app, local.tenantId, '2026-10-10');
+    expect(delDiez).toHaveLength(1);
+    expect(delDiez[0]!.cliente?.nombre).toBe('Trasnochador');
+    expect(await reservasDelDia(app, local.tenantId, '2026-10-11')).toHaveLength(0);
+  });
+
+  it('pasado el cierre, la madrugada ya es del día nuevo', async () => {
+    // A las 03:00 el local está cerrado hace una hora. Va como walk-in porque una
+    // reserva a esa hora el motor no la toma, justamente por estar cerrado.
+    await ocuparMesa(app, {
+      tenantId: local.tenantId, mesaIds: [local.mesas['1']!], personas: 2,
+      inicio: new Date('2026-10-11T03:00:00-03:00'), actor: STAFF,
+    });
+
     expect(await reservasDelDia(app, local.tenantId, '2026-10-10')).toHaveLength(0);
+    expect(await reservasDelDia(app, local.tenantId, '2026-10-11')).toHaveLength(1);
+  });
+
+  it('el corte es en hora local, no en UTC', async () => {
+    // En UTC, una reserva de las 22:00 de Buenos Aires ya cae al día siguiente: sin
+    // esta cuenta, la planilla del sábado aparecería vacía.
+    await reservar('22:00');
+    expect(await reservasDelDia(app, local.tenantId, '2026-10-10')).toHaveLength(1);
   });
 
   it('ordena por horario', async () => {

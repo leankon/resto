@@ -260,3 +260,8 @@ tr.pasada td { color: var(--suave); }
 .envoltorio-plano { overflow-x: auto; padding-bottom: 6px; }
 /* Libre en este instante, pero la toman antes de que termine el turno que se quiere mover. */
 .ficha.nolesirve { opacity: .4; cursor: not-allowed; }
+
+/* Selector de hora del plano: flechas a los costados del desplegable. */
+.reloj { display: flex; align-items: center; gap: 6px; }
+.reloj form { display: flex; align-items: center; gap: 6px; }
+.reloj select { width: auto; margin-top: 0; padding: 5px 8px; font-variant-numeric: tabular-nums; }

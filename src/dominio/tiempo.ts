@@ -107,3 +107,13 @@ export function aHHMM(minutos: number): string {
   const m = ((minutos % 1440) + 1440) % 1440;
   return `${String(Math.floor(m / 60)).padStart(2, '0')}:${String(m % 60).padStart(2, '0')}`;
 }
+
+/**
+ * El día de servicio de un instante, dado el corte del local en minutos.
+ *
+ * Correr el reloj hacia atrás hasta el corte y recién ahí mirar la fecha: con cierre a
+ * las 02:00, la 01:00 del domingo se vuelve las 23:00 del sábado.
+ */
+export function fechaDeServicio(instante: Date, tz: string, corteMin: number): string {
+  return fechaLocal(new Date(instante.getTime() - corteMin * 60_000), tz);
+}

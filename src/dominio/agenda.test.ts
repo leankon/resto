@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { horariosDelDia, horasDeApertura } from './agenda';
+import { horariosDelDia, horasDeApertura, instanteDeServicio } from './agenda';
 import { ALMUERZO, CENA, TZ, local } from './fixtures';
 import type { DiaSemana } from './tipos';
 import { reglasSembradas, type ConfigTurnos } from './turnos';
@@ -92,48 +92,42 @@ describe('horariosDelDia', () => {
 });
 
 describe('horasDeApertura', () => {
-  it('cubre lo que abre ese día más la cola de la noche anterior', () => {
+  it('va de cuarto en cuarto de hora, sin horas sueltas en el medio', () => {
+    // El plano se mira de a saltos parejos: poder caer en las 23:01 no le sirve a nadie
+    // y hace que dos personas miren momentos distintos creyendo que miran el mismo.
+    for (const hora of horasDeApertura('2026-09-15', config)) {
+      expect(['00', '15', '30', '45']).toContain(hora.slice(3));
+    }
+  });
+
+  it('llega hasta el cierre, aunque sea de madrugada', () => {
     const horas = horasDeApertura('2026-09-15', config);
 
     expect(horas).toContain('12:00');   // abre el almuerzo
     expect(horas).toContain('16:00');   // cierra el almuerzo
     expect(horas).toContain('20:00');   // abre la cena
-    expect(horas).toContain('23:00');
-    // La madrugada de este día es la cola de la cena de ayer, y aparece igual: a la
-    // 01:00 todavía hay mesas ocupadas y el encargado tiene que poder verlas.
+    expect(horas).toContain('23:30');
+    // A la 01:00 todavía hay mesas ocupadas y el encargado tiene que poder verlas.
     expect(horas).toContain('01:00');
     expect(horas).toContain('02:00');
   });
 
-  it('son horas de reloj de ese día, nunca pasadas las 24', () => {
-    // La planilla del día es por día de almanaque: si acá apareciera "25:00" o una
-    // hora del día siguiente, el plano mostraría otro momento que la planilla.
-    for (const hora of horasDeApertura('2026-09-15', config)) {
-      expect(hora).toMatch(/^([01]\d|2[0-3]):[0-5]\d$/);
-    }
+  it('la madrugada va al final, que es cuando pasa', () => {
+    // Ordenadas por etiqueta, la 01:00 saldría antes que el almuerzo.
+    const horas = horasDeApertura('2026-09-15', config);
+    expect(horas.at(-1)).toBe('02:00');
+    expect(horas[0]).toBe('12:00');
   });
 
-  it('un lunes no arrastra la madrugada si el domingo el local no abre de noche', () => {
-    const sinDomingo = {
-      ...config,
-      // 2026-09-14 es lunes; el domingo (0) queda afuera de la cena.
-      franjas: [{ ...CENA, dias: [1, 2, 3, 4, 5, 6] as DiaSemana[] }],
-    };
-    const horas = horasDeApertura('2026-09-14', sinDomingo);
-
-    expect(horas).toContain('20:00');
-    expect(horas).not.toContain('01:00');
-  });
-
-  it('la apertura entra aunque no caiga en la hora redonda', () => {
+  it('la apertura entra aunque no caiga en el paso', () => {
     const abreQuebrado = {
       ...config,
-      franjas: [{ ...CENA, desde: '19:30', dias: [2] as DiaSemana[] }],
+      franjas: [{ ...CENA, desde: '19:35', dias: [2] as DiaSemana[] }],
     };
     const horas = horasDeApertura('2026-09-15', abreQuebrado);
 
-    expect(horas[0]).toBe('19:30');
-    expect(horas[1]).toBe('20:00');
+    expect(horas[0]).toBe('19:35');
+    expect(horas[1]).toBe('19:45');
   });
 
   it('un día sin servicio no tiene horas que mirar', () => {
@@ -148,5 +142,34 @@ describe('horasDeApertura', () => {
     };
     const horas = horasDeApertura('2026-09-15', pegadas);
     expect(new Set(horas).size).toBe(horas.length);
+  });
+});
+
+describe('instanteDeServicio', () => {
+  const CORTE = 120; // el local cierra a las 02:00
+
+  it('la madrugada del sábado es, en el reloj, la del domingo', () => {
+    expect(instanteDeServicio('2026-09-15', '01:00', TZ, CORTE).toISOString()).toBe(
+      local('2026-09-16T01:00').toISOString(),
+    );
+  });
+
+  it('la cena de las 21:00 es la de ese mismo día', () => {
+    expect(instanteDeServicio('2026-09-15', '21:00', TZ, CORTE).toISOString()).toBe(
+      local('2026-09-15T21:00').toISOString(),
+    );
+  });
+
+  it('la hora de cierre todavía es la noche anterior', () => {
+    // A las 02:00 se están yendo los últimos de la noche del 15, no llegando los del 16.
+    expect(instanteDeServicio('2026-09-15', '02:00', TZ, CORTE).toISOString()).toBe(
+      local('2026-09-16T02:00').toISOString(),
+    );
+  });
+
+  it('sin corte, la medianoche es la de ese día y no la del siguiente', () => {
+    expect(instanteDeServicio('2026-09-15', '00:00', TZ, 0).toISOString()).toBe(
+      local('2026-09-15T00:00').toISOString(),
+    );
   });
 });

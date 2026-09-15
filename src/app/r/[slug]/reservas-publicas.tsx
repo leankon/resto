@@ -74,6 +74,7 @@ export default async function ReservasPublicas({
           <label>
             Día
             <input
+              key={fecha}
               type="date"
               name="fecha"
               defaultValue={fecha}
@@ -83,7 +84,7 @@ export default async function ReservasPublicas({
           </label>
           <label>
             Personas
-            <select name="personas" defaultValue={String(personas)}>
+            <select key={personas} name="personas" defaultValue={String(personas)}>
               {Array.from({ length: local.personasMaxWeb }, (_, i) => i + 1).map((n) => (
                 <option key={n} value={n}>
                   {n === 1 ? '1 persona' : `${n} personas`}
