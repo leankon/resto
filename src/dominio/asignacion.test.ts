@@ -85,6 +85,7 @@ describe('asignar', () => {
     const resultado = elegir(pedido(6), ocupar('t6'));
     expect(resultado.log.descartados).toContainEqual({
       clave: 't6',
+      etiqueta: 't6',
       motivo: 'ocupada: t6',
     });
   });

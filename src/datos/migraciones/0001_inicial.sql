@@ -176,7 +176,8 @@ CREATE TABLE excepciones_calendario (
 CREATE TABLE clientes (
   id              uuid PRIMARY KEY DEFAULT gen_random_uuid(),
   tenant_id       uuid NOT NULL REFERENCES tenants(id) ON DELETE CASCADE,
-  telefono_e164   text,
+  telefono_e164   text,          -- canónico: el que se marca o se usa en WhatsApp
+  telefono_clave  text,          -- deduplicación: ver dominio/clientes.ts
   email           text,
   nombre          text NOT NULL,
   visitas         int NOT NULL DEFAULT 0,
@@ -187,12 +188,18 @@ CREATE TABLE clientes (
   etiquetas       text[] NOT NULL DEFAULT '{}',
   creado_en       timestamptz NOT NULL DEFAULT now(),
   actualizado_en  timestamptz NOT NULL DEFAULT now(),
-  CHECK (telefono_e164 IS NOT NULL OR email IS NOT NULL)
+  CHECK (telefono_clave IS NOT NULL OR email IS NOT NULL),
+  CHECK ((telefono_e164 IS NULL) = (telefono_clave IS NULL))
 );
 -- Índices parciales: el teléfono identifica al cliente dentro del local; si no
 -- dejó teléfono, el mail hace de identificador alternativo.
+--
+-- El único va sobre telefono_clave, no sobre telefono_e164: en Argentina el mismo
+-- celular tiene dos E.164 válidos según cómo lo tipeen (con o sin el 9 de celular),
+-- y si la identidad dependiera del E.164 el mismo comensal quedaría partido en dos
+-- clientes con medio historial cada uno.
 CREATE UNIQUE INDEX clientes_tenant_telefono
-  ON clientes (tenant_id, telefono_e164) WHERE telefono_e164 IS NOT NULL;
+  ON clientes (tenant_id, telefono_clave) WHERE telefono_clave IS NOT NULL;
 CREATE UNIQUE INDEX clientes_tenant_email
   ON clientes (tenant_id, lower(email)) WHERE email IS NOT NULL;
 

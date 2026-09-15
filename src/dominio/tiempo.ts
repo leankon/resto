@@ -52,3 +52,13 @@ export function seSolapan(
   // Semiabiertos [desde, hasta): tocarse en el borde no es solaparse.
   return a.desde < b.hasta && b.desde < a.hasta;
 }
+
+/** Fecha calendario (YYYY-MM-DD) en la zona del local. Es la clave del lock del día. */
+export function fechaLocal(fecha: Date, tz: string): string {
+  return new Intl.DateTimeFormat('en-CA', {
+    timeZone: tz,
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+  }).format(fecha);
+}

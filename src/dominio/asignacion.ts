@@ -1,4 +1,4 @@
-import type { Candidato } from './combinaciones.js';
+import { compararNatural, type Candidato } from './combinaciones.js';
 import type { ConfigAsignacion, Id, Mesa, Minutos, Ocupacion, Periodo } from './tipos.js';
 import { seSolapan, sumarMinutos } from './tiempo.js';
 
@@ -25,6 +25,8 @@ export interface DetallePuntaje {
 
 export interface CandidatoEvaluado {
   clave: string;
+  /** Nombres de mesa: es lo que el local reconoce al leer el log. */
+  etiqueta: string;
   mesas: Id[];
   capacidadNominal: number;
   capacidadMax: number;
@@ -35,6 +37,7 @@ export interface CandidatoEvaluado {
 
 export interface Descartado {
   clave: string;
+  etiqueta: string;
   motivo: string;
 }
 
@@ -167,20 +170,29 @@ export function asignar(
 
   for (const candidato of candidatos) {
     if (pedido.personas > candidato.capacidadMax) {
-      descartados.push({ clave: candidato.clave, motivo: 'no entra el grupo' });
+      descartados.push({
+        clave: candidato.clave,
+        etiqueta: candidato.etiqueta,
+        motivo: 'no entra el grupo',
+      });
       continue;
     }
     const chocan = candidato.mesas.filter((m) => ocupada(m.id));
     if (chocan.length > 0) {
       descartados.push({
         clave: candidato.clave,
+        etiqueta: candidato.etiqueta,
         motivo: `ocupada: ${chocan.map((m) => m.nombre).join(', ')}`,
       });
       continue;
     }
     if (pedido.personas < candidato.capacidadMin) {
       hayAlgunoSinCapacidadMin = true;
-      descartados.push({ clave: candidato.clave, motivo: 'grupo muy chico para esta mesa' });
+      descartados.push({
+        clave: candidato.clave,
+        etiqueta: candidato.etiqueta,
+        motivo: 'grupo muy chico para esta mesa',
+      });
       continue;
     }
     libresQueEntran.push(candidato);
@@ -224,6 +236,7 @@ export function asignar(
 
     return {
       clave: candidato.clave,
+      etiqueta: candidato.etiqueta,
       mesas: candidato.mesas.map((m) => m.id),
       capacidadNominal: candidato.capacidadNominal,
       capacidadMax: candidato.capacidadMax,
@@ -233,9 +246,12 @@ export function asignar(
     };
   });
 
-  // Desempate determinista por clave: el mismo input da siempre el mismo output, que es
-  // lo que hace testeable al motor y reproducible un reclamo del local.
-  evaluados.sort((a, b) => a.puntaje - b.puntaje || (a.clave < b.clave ? -1 : 1));
+  // Desempate por nombre de mesa, no por id: entre dos opciones igual de buenas gana la
+  // mesa más baja, que es una regla que el local puede predecir y verificar. Desempatar
+  // por uuid daría un resultado igual de determinista pero imposible de explicar.
+  evaluados.sort(
+    (a, b) => a.puntaje - b.puntaje || compararNatural(a.etiqueta, b.etiqueta),
+  );
 
   const ganador = evaluados[0];
   const log: Explicacion = {
@@ -270,6 +286,22 @@ export interface Alternativa {
   inicio: Date;
   desplazamientoMin: Minutos;
   mesas: Id[];
+  etiqueta: string;
+}
+
+/**
+ * Horarios a probar cuando no hay lugar, en pasos de 15 minutos (D8).
+ *
+ * Hacia adelante hay que cubrir un turno entero más un poco: si el turno dura 105
+ * minutos y solo miramos hasta +60, todas las alternativas chocan con las mismas
+ * reservas y el cliente se va a la lista de espera teniendo lugar a las 23:00.
+ */
+function grillaDeAlternativas(pedido: Pedido): Minutos[] {
+  const adelante = Math.ceil((pedido.duracionMin + pedido.bufferMin + 30) / 15) * 15;
+  const pasos: Minutos[] = [];
+  for (let m = 60; m >= 15; m -= 15) pasos.push(-m);
+  for (let m = 15; m <= adelante; m += 15) pasos.push(m);
+  return pasos;
 }
 
 /**
@@ -281,9 +313,11 @@ export function buscarAlternativas(
   ocupaciones: Ocupacion[],
   pedido: Pedido,
   config: ConfigAsignacion,
-  desplazamientos: Minutos[] = [-30, -15, 15, 30, 45, 60],
+  opciones: { desplazamientos?: Minutos[]; maximo?: number } = {},
 ): Alternativa[] {
+  const desplazamientos = opciones.desplazamientos ?? grillaDeAlternativas(pedido);
   const alternativas: Alternativa[] = [];
+
   for (const desplazamiento of desplazamientos) {
     const inicio = sumarMinutos(pedido.inicio, desplazamiento);
     const resultado = asignar(candidatos, ocupaciones, { ...pedido, inicio }, config);
@@ -292,10 +326,13 @@ export function buscarAlternativas(
         inicio,
         desplazamientoMin: desplazamiento,
         mesas: resultado.mesas.map((m) => m.id),
+        etiqueta: resultado.mesas.map((m) => m.nombre).join('+'),
       });
     }
   }
-  return alternativas.sort(
-    (a, b) => Math.abs(a.desplazamientoMin) - Math.abs(b.desplazamientoMin),
-  );
+
+  // Cuatro opciones alcanzan: una lista de doce horarios no ayuda a decidir.
+  return alternativas
+    .sort((a, b) => Math.abs(a.desplazamientoMin) - Math.abs(b.desplazamientoMin))
+    .slice(0, opciones.maximo ?? 4);
 }

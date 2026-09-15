@@ -28,8 +28,8 @@ async function crearLocal(slug: string) {
     [tenantId, salon.rows[0].id],
   );
   const cliente = await admin.query(
-    `INSERT INTO clientes (tenant_id, telefono_e164, nombre)
-     VALUES ($1, '+5491100000000', 'Cliente') RETURNING id`,
+    `INSERT INTO clientes (tenant_id, telefono_e164, telefono_clave, nombre)
+     VALUES ($1, '+5491100000000', '+541100000000', 'Cliente') RETURNING id`,
     [tenantId],
   );
   return { tenantId, mesaId: mesa.rows[0].id as string, clienteId: cliente.rows[0].id as string };
@@ -229,14 +229,14 @@ describe('row level security', () => {
   it('el historial de clientes no se cruza entre locales', async () => {
     // El mismo teléfono en dos locales son dos filas distintas, a propósito.
     const { rows } = await admin.query(
-      `SELECT tenant_id FROM clientes WHERE telefono_e164 = '+5491100000000'
+      `SELECT tenant_id FROM clientes WHERE telefono_clave = '+541100000000'
          AND tenant_id = ANY($1)`,
       [[tenantA, tenantB]],
     );
     expect(rows).toHaveLength(2);
 
     const vistosPorA = await conTenant(app, tenantA, (c) =>
-      c.query(`SELECT id FROM clientes WHERE telefono_e164 = '+5491100000000'`),
+      c.query(`SELECT id FROM clientes WHERE telefono_clave = '+541100000000'`),
     );
     expect(vistosPorA.rows).toHaveLength(1);
   });

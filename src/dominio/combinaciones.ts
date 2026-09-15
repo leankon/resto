@@ -5,9 +5,19 @@ import type { Centimetros, ConfigAsignacion, Id, Mesa } from './tipos.js';
  *
  * Los candidatos se derivan del plano (D7): el local carga mesas, no combinaciones.
  */
+/**
+ * Compara nombres de mesa como los lee una persona: la 2 va antes que la 10.
+ * `localeCompare` con `numeric` evita el orden lexicográfico que pondría "10" antes de "2".
+ */
+export function compararNatural(a: string, b: string): number {
+  return a.localeCompare(b, 'es', { numeric: true, sensitivity: 'base' });
+}
+
 export interface Candidato {
-  /** Ids ordenados, unidos por "+". Estable: sirve de clave y de desempate. */
+  /** Ids ordenados, unidos por "+". Clave estable del conjunto. */
   clave: string;
+  /** Nombres de mesa como los dice el mozo: "3+4". Es lo que se lee en el log. */
+  etiqueta: string;
   mesas: Mesa[];
   salonId: Id;
   /** Sillas sin agregar cabeceras, ya descontada la pérdida por unir. */
@@ -58,14 +68,21 @@ function costoDeUnir(mesas: Mesa[]): Centimetros {
 }
 
 function armarCandidato(mesas: Mesa[], config: ConfigAsignacion): Candidato {
-  const ordenadas = [...mesas].sort((a, b) => (a.id < b.id ? -1 : 1));
+  // Orden de presentación por nombre; la clave se arma con los ids ordenados, que es
+  // independiente de cómo se llamen las mesas.
+  const ordenadas = [...mesas].sort(
+    (a, b) => compararNatural(a.nombre, b.nombre) || (a.id < b.id ? -1 : 1),
+  );
+  const clave = mesas.map((m) => m.id).sort().join('+');
+  const etiqueta = ordenadas.map((m) => m.nombre).join('+');
   const base = ordenadas.reduce((acc, m) => acc + m.capacidadBase, 0);
   const cabeceras = ordenadas.reduce((acc, m) => acc + m.cabeceras, 0);
 
   if (ordenadas.length === 1) {
     const mesa = ordenadas[0]!;
     return {
-      clave: mesa.id,
+      clave,
+      etiqueta,
       mesas: ordenadas,
       salonId: mesa.salonId,
       capacidadNominal: mesa.capacidadBase,
@@ -84,7 +101,8 @@ function armarCandidato(mesas: Mesa[], config: ConfigAsignacion): Candidato {
   const mayorSuelta = Math.max(...ordenadas.map((m) => m.capacidadBase + m.cabeceras));
 
   return {
-    clave: ordenadas.map((m) => m.id).join('+'),
+    clave,
+    etiqueta,
     mesas: ordenadas,
     salonId: ordenadas[0]!.salonId,
     capacidadNominal,
