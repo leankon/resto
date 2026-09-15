@@ -17,13 +17,14 @@ npm run db:demo      # carga un local de prueba con reservas
 npm run db:migrar    # aplica migraciones pendientes (necesita DATABASE_URL_OWNER)
 npm run dev          # panel en http://localhost:3000
 
-npm test             # 197 tests
+npm test             # 199 tests
 npm run test:unit    # solo el motor, sin base de datos
 npm run humo         # recorrido de humo en navegador (requiere el server andando)
 npm run humo:salon     # recorrido de humo sobre la carga del salón
 npm run humo:horarios  # recorrido de humo sobre horarios y turnos
 npm run humo:equipo    # recorrido de humo sobre el equipo y los permisos
 npm run humo:publico   # recorrido de humo sobre la web pública y el widget
+npm run humo:plano     # recorrido de humo sobre el salón en vivo y la reasignación
 ```
 
 Usuarios de prueba que deja `db:demo`:
@@ -64,7 +65,13 @@ ve alguien de la calle.
   muestran y los cuatro límites con los que el local acepta reservas de gente que no
   conoce.
 
-Falta de la Fase 2: la vista visual del salón con reasignación arrastrando.
+- **El salón en vivo** (en la planilla del día): el plano a escala a la hora que se
+  mire, con cada mesa pintada según quién la tiene. Tocar una mesa ocupada y después
+  una libre mueve la reserva entera. Solo se ofrecen las mesas que aguantan el turno
+  completo: una mesa libre a las 21:00 pero tomada a las 21:15 no sirve, y ofrecerla
+  sería mandar al mozo a un rechazo con el cliente esperando.
+
+**Fase 2 completa.** Sigue la Fase 3: lista de espera, recordatorios y bot de WhatsApp.
 
 ## Cómo está organizado
 

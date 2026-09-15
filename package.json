@@ -21,7 +21,8 @@
     "db:migrar": "tsx scripts/migrar.ts",
     "humo:horarios": "node scripts/humo-horarios.mjs",
     "humo:equipo": "node scripts/humo-equipo.mjs",
-    "humo:publico": "node scripts/humo-publico.mjs"
+    "humo:publico": "node scripts/humo-publico.mjs",
+    "humo:plano": "node scripts/humo-plano.mjs"
   },
   "devDependencies": {
     "@types/pg": "^8.23.1",

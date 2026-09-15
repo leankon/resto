@@ -118,6 +118,48 @@ describe('estadoDelSalon', () => {
     const salones = await estadoDelSalon(app, local.tenantId, cena('12:30'));
     expect(salones.flatMap((s) => s.mesas).every((m) => !m.ocupadaPor)).toBe(true);
   });
+
+  it('trae el turno entero de cada mesa, no solo el instante que se mira', async () => {
+    // Dos reservas seguidas en mesas distintas: a las 20:30 la segunda mesa está
+    // libre, pero la toman a las 21:15. El plano necesita saberlo para no ofrecerla
+    // como destino de una reserva que todavía no terminó.
+    const temprano = await reservar('20:30');
+    const tarde = await reservar('21:15', 2, 'Bruno', '1155556666');
+    if (temprano.tipo !== 'creada' || tarde.tipo !== 'creada') throw new Error('no asignó');
+
+    const salones = await estadoDelSalon(app, local.tenantId, cena('20:30'));
+    const mesas = salones.flatMap((s) => s.mesas);
+
+    const deLaTarde = mesas.find((m) => m.nombre === tarde.mesas[0]!.nombre)!;
+    expect(deLaTarde.ocupadaPor).toBeNull();
+    expect(deLaTarde.ocupaciones).toHaveLength(1);
+    expect(deLaTarde.ocupaciones[0]!.reservaId).toBe(tarde.reservaId);
+
+    // Y las que nadie tiene en todo el turno vienen sin nada.
+    const libres = mesas.filter((m) => m.ocupaciones.length === 0);
+    expect(libres.length).toBeGreaterThan(0);
+  });
+
+  it('cada mesa sabe con qué otras comparte la reserva', async () => {
+    // Una reserva armada con dos mesas unidas. Sin esto el plano la muestra como dos
+    // ocupaciones sueltas, y mover una sola dejaría la reserva partida a la mitad.
+    const grupo = await reservar('21:00', 6, 'Grupo', '1177778888');
+    if (grupo.tipo !== 'creada') throw new Error('no asignó');
+    await reasignarMesa(app, {
+      tenantId: local.tenantId,
+      reservaId: grupo.reservaId,
+      mesaIds: [local.mesas['6']!, local.mesas['7']!],
+      actor: STAFF,
+    });
+
+    const salones = await estadoDelSalon(app, local.tenantId, cena('21:30'));
+    const ocupadas = salones.flatMap((s) => s.mesas).filter((m) => m.ocupadaPor);
+
+    expect(ocupadas.map((m) => m.nombre).sort()).toEqual(['6', '7']);
+    for (const mesa of ocupadas) {
+      expect([mesa.nombre, ...mesa.ocupadaPor!.conMesas].sort()).toEqual(['6', '7']);
+    }
+  });
 });
 
 describe('historial', () => {

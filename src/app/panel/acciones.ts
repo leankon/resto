@@ -166,3 +166,16 @@ export async function nuevaReserva(
       };
   }
 }
+
+/**
+ * Mover una reserva desde el plano.
+ *
+ * Es `moverDeMesa` con la forma que espera `useActionState`: el plano necesita mostrar
+ * el error al lado del salón, no navegar a otra pantalla.
+ */
+export async function moverDesdeElPlano(
+  _previo: string | null,
+  datos: FormData,
+): Promise<string | null> {
+  return moverDeMesa(datos);
+}

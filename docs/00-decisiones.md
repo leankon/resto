@@ -216,3 +216,23 @@ Todo lo demás —qué horarios se ofrecen, cuánto dura el turno, qué mesa toc
 configuración que ya existe. **La grilla de horarios corre el mismo motor que una reserva
 real**, mesa por mesa: si la web ofreciera horarios con un criterio propio, el cliente
 elegiría uno que después el motor rechaza, y se enteraría recién con los datos cargados.
+
+## D14 — El plano ofrece mesas por turno, no por instante
+
+La vista del salón muestra un momento: "el salón a las 21:00". Pero una reserva no es un
+instante, es un turno de una hora y media más el buffer de limpieza.
+
+La primera versión ofrecía como destino cualquier mesa libre **en ese instante**. El
+efecto era el peor posible: el mozo veía la mesa 2 libre, movía ahí la reserva de las
+20:30, y la base rechazaba el movimiento porque la mesa 2 está tomada desde las 21:15.
+El sistema tenía razón y la pantalla mentía.
+
+Ahora el plano carga, por mesa, **todas las ocupaciones del turno**, y solo marca como
+destino las que están libres durante el período completo de la reserva que se está
+moviendo. Las que no sirven quedan apagadas y no responden al toque, con el motivo en el
+título. La constraint `EXCLUDE` sigue ahí como red de seguridad; lo que cambió es que
+ahora casi nunca se llega a tocarla.
+
+**Consecuencia:** mover una reserva armada con varias mesas las mueve todas. Es lo
+correcto —una reserva de seis en dos mesas unidas no se parte en dos— y el cartel lo dice
+antes de que se confirme.

@@ -1,5 +1,6 @@
 import type pg from 'pg';
 import { conTenant } from '../datos/conexion';
+import type { FormaMesa } from '../dominio/tipos';
 
 export interface ReservaDelDia {
   id: string;
@@ -178,12 +179,32 @@ export interface MesaEnPlano {
   cabeceras: number;
   x: number;
   y: number;
-  ocupadaPor: { reservaId: string; cliente: string | null; personas: number; estado: string } | null;
+  /** Para dibujarla con su forma real: de acá sale el tamaño en el plano. */
+  forma: FormaMesa;
+  /**
+   * Todo lo que tiene esta mesa alrededor de ese momento, no solo lo de ese instante.
+   *
+   * Una mesa puede estar libre a las 21:00 y tomada a las 21:15. Sin esto el plano la
+   * ofrece para mover una reserva de las 20:30, el staff la elige, y recién ahí la base
+   * rechaza el movimiento. Con esto directamente no se ofrece.
+   */
+  ocupaciones: { reservaId: string; desde: Date; hasta: Date }[];
+  ocupadaPor: {
+    reservaId: string;
+    cliente: string | null;
+    personas: number;
+    estado: string;
+    inicio: Date;
+    /** Las otras mesas de la misma reserva, cuando está armada con varias. */
+    conMesas: string[];
+  } | null;
 }
 
 export interface SalonEnPlano {
   id: string;
   nombre: string;
+  anchoCm: number;
+  altoCm: number;
   mesas: MesaEnPlano[];
 }
 
@@ -195,9 +216,14 @@ export async function estadoDelSalon(
 ): Promise<SalonEnPlano[]> {
   return conTenant(pool, tenantId, async (c) => {
     const { rows } = await c.query(
-      `SELECT s.id AS salon_id, s.nombre AS salon, m.id, m.nombre,
-              m.capacidad_base, m.cabeceras, m.x, m.y,
-              r.id AS reserva_id, r.personas, r.estado, cl.nombre AS cliente
+      `SELECT s.id AS salon_id, s.nombre AS salon, s.ancho_cm, s.alto_cm,
+              m.id, m.nombre, m.capacidad_base, m.cabeceras, m.x, m.y, m.forma,
+              r.id AS reserva_id, r.personas, r.estado, r.inicio, cl.nombre AS cliente,
+              -- Las otras mesas de la misma reserva: sin esto, mover una mesa de un
+              -- combo de tres parece mover la reserva entera y deja las otras dos.
+              (SELECT array_agg(m2.nombre ORDER BY m2.nombre)
+                 FROM reservas_mesas rm2 JOIN mesas m2 ON m2.id = rm2.mesa_id
+                WHERE rm2.reserva_id = r.id AND m2.id <> m.id) AS con_mesas
          FROM salones s
          JOIN mesas m ON m.salon_id = s.id AND m.activa
          LEFT JOIN reservas_mesas rm
@@ -209,11 +235,34 @@ export async function estadoDelSalon(
       [tenantId, momento],
     );
 
+    // Las ocupaciones del turno entero, en una sola consulta para todo el salón.
+    const { rows: periodos } = await c.query(
+      `SELECT rm.mesa_id, rm.reserva_id,
+              lower(rm.periodo) AS desde, upper(rm.periodo) AS hasta
+         FROM reservas_mesas rm
+        WHERE rm.tenant_id = $1 AND rm.bloqueante
+          AND rm.periodo && tstzrange($2::timestamptz - interval '8 hours',
+                                      $2::timestamptz + interval '8 hours')`,
+      [tenantId, momento],
+    );
+    const porMesa = new Map<string, MesaEnPlano['ocupaciones']>();
+    for (const f of periodos) {
+      const lista = porMesa.get(f.mesa_id) ?? [];
+      lista.push({ reservaId: f.reserva_id, desde: f.desde, hasta: f.hasta });
+      porMesa.set(f.mesa_id, lista);
+    }
+
     const salones = new Map<string, SalonEnPlano>();
     for (const f of rows) {
       let salon = salones.get(f.salon_id);
       if (!salon) {
-        salon = { id: f.salon_id, nombre: f.salon, mesas: [] };
+        salon = {
+          id: f.salon_id,
+          nombre: f.salon,
+          anchoCm: f.ancho_cm,
+          altoCm: f.alto_cm,
+          mesas: [],
+        };
         salones.set(f.salon_id, salon);
       }
       salon.mesas.push({
@@ -223,12 +272,16 @@ export async function estadoDelSalon(
         cabeceras: f.cabeceras,
         x: f.x,
         y: f.y,
+        forma: f.forma,
+        ocupaciones: porMesa.get(f.id) ?? [],
         ocupadaPor: f.reserva_id
           ? {
               reservaId: f.reserva_id,
               cliente: f.cliente,
               personas: f.personas,
               estado: f.estado,
+              inicio: f.inicio,
+              conMesas: (f.con_mesas ?? []) as string[],
             }
           : null,
       });

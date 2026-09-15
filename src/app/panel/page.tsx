@@ -3,6 +3,7 @@ import { salir } from '../login/acciones';
 import { poolApp, requerirStaff } from '../../web/contexto';
 import { fechaCorta, hoyEn, instanteLocal, sumarDias } from '../../web/formato';
 import { estadoDelSalon, ingresosPorBloque, reservasDelDia } from '../../servicios/panel';
+import Plano from './plano';
 import Tabla from './tabla';
 
 type Parametros = Promise<{ fecha?: string; salon?: string; hora?: string }>;
@@ -110,6 +111,10 @@ export default async function Panel({ searchParams }: { searchParams: Parametros
 
         <section className="tarjeta">
           <h2>El salón a las {horaPlano}</h2>
+          <p className="apagado" style={{ marginTop: -8 }}>
+            Tocá una mesa ocupada y después una libre para mover la reserva. Queda fijada:
+            el sistema no la vuelve a reacomodar solo.
+          </p>
           <div className="fila" style={{ marginBottom: 14 }}>
             <div className="solapas" style={{ margin: 0, flex: '1 1 auto' }}>
               {salones.map((s) => (
@@ -131,23 +136,13 @@ export default async function Panel({ searchParams }: { searchParams: Parametros
             </div>
           </div>
 
-          <div className="mesas">
-            {salonActivo?.mesas.map((m) => (
-              <div key={m.id} className={`mesa ${m.ocupadaPor ? 'ocupada' : ''}`}>
-                <div className="nombre">{m.nombre}</div>
-                <div className="detalle">
-                  {m.capacidadBase}
-                  {m.cabeceras > 0 && `–${m.capacidadBase + m.cabeceras}`} lugares
-                </div>
-                <div className="detalle">
-                  {m.ocupadaPor
-                    ? `${m.ocupadaPor.cliente ?? 'Sin reserva'} · ${m.ocupadaPor.personas}`
-                    : 'libre'}
-                </div>
-              </div>
-            ))}
-          </div>
-          {!salonActivo && <p className="vacio">Este local todavía no tiene mesas cargadas.</p>}
+          {salonActivo ? (
+            <div className="envoltorio-plano">
+              <Plano salon={salonActivo} tz={tz} hora={horaPlano} />
+            </div>
+          ) : (
+            <p className="vacio">Este local todavía no tiene mesas cargadas.</p>
+          )}
         </section>
       </main>
     </>

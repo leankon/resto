@@ -226,3 +226,37 @@ tr.pasada td { color: var(--suave); }
   margin-top: 4px; padding: 3px 8px; border-radius: 6px;
   background: #fdf8ec; border: 1px solid #efe3c7; color: #6b5a2e; font-size: 13px;
 }
+
+/* --- El salón en vivo, con reasignación --- */
+
+.plano-vivo .ficha { cursor: pointer; flex-direction: column; gap: 1px; }
+.plano-vivo .ficha em { font-style: normal; font-size: 10px; opacity: .8; }
+
+.ficha.libre { background: #fff; color: var(--suave); border-color: var(--borde); }
+.ficha.esperando { background: #fdf8ec; color: #6b5a2e; border-color: #e0cb9a; }
+.ficha.sentada { background: var(--acento-suave); color: var(--acento); border-color: var(--acento); }
+.ficha.aviso { background: var(--alerta-suave); color: var(--alerta); border-color: #e9b48f; }
+.ficha.elegida { box-shadow: 0 0 0 3px rgb(31 95 75 / .35); z-index: 5; }
+.ficha.posible { border-style: dashed; border-color: var(--acento); color: var(--acento); }
+.ficha.destino { background: var(--acento); border-color: var(--acento); color: #fff; }
+
+.referencias { display: flex; gap: 14px; flex-wrap: wrap; margin-bottom: 12px; font-size: 12px; color: var(--suave); }
+.referencias .ref::before {
+  content: ""; display: inline-block; width: 10px; height: 10px; margin-right: 5px;
+  border-radius: 3px; border: 1.5px solid var(--borde); background: #fff;
+  vertical-align: -1px;
+}
+.referencias .esperando::before { background: #fdf8ec; border-color: #e0cb9a; }
+.referencias .sentada::before { background: var(--acento-suave); border-color: var(--acento); }
+
+.mover {
+  display: flex; gap: 12px; align-items: center; flex-wrap: wrap;
+  padding: 12px 14px; border: 1px solid var(--acento); border-radius: var(--radio);
+  background: var(--acento-suave);
+}
+
+/* En un salón grande el plano no entra: se desplaza en vez de achicar las mesas hasta
+   que no se lean los números. */
+.envoltorio-plano { overflow-x: auto; padding-bottom: 6px; }
+/* Libre en este instante, pero la toman antes de que termine el turno que se quiere mover. */
+.ficha.nolesirve { opacity: .4; cursor: not-allowed; }
