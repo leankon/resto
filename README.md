@@ -17,7 +17,7 @@ npm run db:demo      # carga un local de prueba con reservas
 npm run db:migrar    # aplica migraciones pendientes (necesita DATABASE_URL_OWNER)
 npm run dev          # panel en http://localhost:3000
 
-npm test             # 199 tests
+npm test             # 207 tests
 npm run test:unit    # solo el motor, sin base de datos
 npm run humo         # recorrido de humo en navegador (requiere el server andando)
 npm run humo:salon     # recorrido de humo sobre la carga del salón
@@ -25,6 +25,13 @@ npm run humo:horarios  # recorrido de humo sobre horarios y turnos
 npm run humo:equipo    # recorrido de humo sobre el equipo y los permisos
 npm run humo:publico   # recorrido de humo sobre la web pública y el widget
 npm run humo:plano     # recorrido de humo sobre el salón en vivo y la reasignación
+```
+
+Cada recorrido de humo deja la base cambiada (carga reservas, mueve mesas, marca
+feriados). Corré `npm run db:demo` antes de cada uno: si no, el siguiente falla por lo
+que dejó el anterior y no por un problema de verdad.
+
+```bash
 ```
 
 Usuarios de prueba que deja `db:demo`:
