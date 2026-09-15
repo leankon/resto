@@ -76,6 +76,16 @@ Lo que el esquema **no** necesita, y por eso se puede desplegar:
    ALTER ROLE resto_admin PASSWORD 'otra-más';
    ```
 
+   Dos cosas sobre esas contraseñas:
+
+   - **Neon valida la fuerza y rechaza las débiles** con un error del control plane
+     (`insecure password`), aunque vengan de un `ALTER ROLE` común. Necesitan
+     mayúsculas, minúsculas, números y algún caracter especial.
+   - Van adentro de una URL, así que **evitá `@ : / ? # & = + %` y `$`**: los primeros
+     tienen significado en una URL y el último se interpola en algunos archivos de
+     variables de entorno. Con `- _ . ! * ~` alcanza para cumplir el requisito sin
+     romper nada.
+
 4. Armar las tres URLs con esas contraseñas. TLS se activa solo: `conexion.ts` cifra
    todo lo que no sea localhost.
 
