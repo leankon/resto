@@ -31,9 +31,6 @@ Cada recorrido de humo deja la base cambiada (carga reservas, mueve mesas, marca
 feriados). Corré `npm run db:demo` antes de cada uno: si no, el siguiente falla por lo
 que dejó el anterior y no por un problema de verdad.
 
-```bash
-```
-
 Usuarios de prueba que deja `db:demo`:
 
 | Dónde | Usuario | Contraseña |
