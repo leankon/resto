@@ -17,6 +17,19 @@ import pg from 'pg';
 
 const url = process.env['DATABASE_URL_OWNER'];
 if (!url) {
+  // En un despliegue de verdad, seguir sin migrar publica código que usa columnas que
+  // todavía no existen. El síntoma es una pantalla de "Application error" que aparece
+  // cuando alguien entra, no cuando se despliega, y cuesta muchísimo más rastrear.
+  // Mejor que se caiga acá, con el motivo y el remedio escritos.
+  if (process.env['VERCEL'] || process.env['CI']) {
+    console.error(
+      'migraciones: falta DATABASE_URL_OWNER.\n' +
+        '  Es la conexión del dueño de la base (en Neon, el usuario que termina en\n' +
+        '  "_owner"), y sin ella no se pueden aplicar los cambios de esquema.\n' +
+        '  Agregala en Settings → Environment Variables y volvé a desplegar.',
+    );
+    process.exit(1);
+  }
   console.log('migraciones: DATABASE_URL_OWNER no está definida, no se aplica nada.');
   process.exit(0);
 }
