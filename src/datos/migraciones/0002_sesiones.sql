@@ -24,7 +24,8 @@ CREATE INDEX ON sesiones (expira_en);
 DO $$
 BEGIN
   IF NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'resto_auth') THEN
-    CREATE ROLE resto_auth LOGIN PASSWORD 'dev';
+    -- Sin contraseña, igual que los otros dos: ver la nota en 0001.
+    CREATE ROLE resto_auth LOGIN;
   END IF;
   -- Ver la nota en 0001: solo se corrige si hace falta y si se puede.
   IF EXISTS (SELECT 1 FROM pg_roles

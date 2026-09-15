@@ -67,8 +67,8 @@ Lo que el esquema **no** necesita, y por eso se puede desplegar:
    `npm run db:portabilidad` simula todo esto en local (un usuario con `CREATEROLE`
    pero sin superusuario) para que estos errores no aparezcan recién en el despliegue.
 
-3. **Cambiar las contraseñas de los tres roles.** Las migraciones los crean con `dev`,
-   que está bien en tu máquina y no está bien en internet:
+3. **Ponerles contraseña a los tres roles.** Las migraciones los crean **sin**
+   contraseña a propósito, así que hay que asignarlas al instalar:
 
    ```sql
    ALTER ROLE resto_app   PASSWORD 'una-clave-larga-y-distinta';
@@ -78,8 +78,10 @@ Lo que el esquema **no** necesita, y por eso se puede desplegar:
 
    Dos cosas sobre esas contraseñas:
 
-   - **Neon valida la fuerza y rechaza las débiles** con un error del control plane
-     (`insecure password`), aunque vengan de un `ALTER ROLE` común. Necesitan
+   - **Neon valida la fuerza y rechaza las débiles** con un error de su control plane
+     (`insecure password`), no de Postgres. Pasa tanto en `ALTER ROLE` como en
+     `CREATE ROLE`, y por eso las migraciones no traen ninguna adentro: una clave de
+     desarrollo hardcodeada hacía que el esquema no se pudiera instalar. Necesitan
      mayúsculas, minúsculas, números y algún caracter especial.
    - Van adentro de una URL, así que **evitá `@ : / ? # & = + %` y `$`**: los primeros
      tienen significado en una URL y el último se interpola en algunos archivos de

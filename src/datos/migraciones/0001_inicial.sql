@@ -19,13 +19,23 @@ CREATE EXTENSION IF NOT EXISTS pgcrypto;     -- gen_random_uuid()
 -- de verdad, y en Postgres gestionado (Supabase, Neon, RDS) el rol con el que uno
 -- entra NO lo es. El acceso ampliado del super-admin se da con políticas apuntadas
 -- al rol (`TO resto_admin`), que es más preciso y además funciona en cualquier lado.
+-- Los roles se crean SIN contraseña a propósito.
+--
+-- Postgres gestionado valida la fuerza de la contraseña y rechaza las débiles: Neon
+-- corta un `CREATE ROLE ... PASSWORD 'dev'` con un error de su control plane, no de
+-- Postgres. Dejar acá una contraseña de desarrollo hacía que el esquema no se pudiera
+-- instalar en ningún lado más que en una máquina propia.
+--
+-- En local no hace falta ninguna: el cluster de `scripts/db-local.sh` usa autenticación
+-- `trust`. En un despliegue real, la contraseña se pone al instalar, y tiene que ser
+-- fuerte y sin caracteres que rompan una URL (ver docs/06-desplegar.md).
 DO $$
 BEGIN
   IF NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'resto_app') THEN
-    CREATE ROLE resto_app LOGIN PASSWORD 'dev';
+    CREATE ROLE resto_app LOGIN;
   END IF;
   IF NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'resto_admin') THEN
-    CREATE ROLE resto_admin LOGIN PASSWORD 'dev';
+    CREATE ROLE resto_admin LOGIN;
   END IF;
   -- Converge el estado, pero solo si hace falta: cambiar SUPERUSER o BYPASSRLS exige
   -- ser superusuario de verdad, y en Postgres gestionado (Neon, Supabase, RDS) no lo

@@ -18,6 +18,17 @@ USUARIO=sim_owner
 RAIZ="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 sql() { psql -h localhost -p "$PORT" -U postgres "$@"; }
 
+# Neon y Supabase validan la fuerza de la contraseña en su propio control plane y
+# rechazan un CREATE ROLE con una débil. Eso no se puede simular en local, así que
+# lo que se verifica es que las migraciones no traigan ninguna hardcodeada.
+echo "Verificando que las migraciones no lleven contraseñas adentro…"
+if grep -n "PASSWORD '" "$RAIZ"/src/datos/migraciones/*.sql | grep -v '^\s*--' | grep -v -- '--'; then
+  echo "ERROR: hay una contraseña en las migraciones." >&2
+  echo "Postgres gestionado rechaza las débiles y el esquema no se va a poder instalar." >&2
+  echo "Los roles se crean sin contraseña; se les pone una al desplegar." >&2
+  exit 1
+fi
+
 echo "Preparando un Postgres que se comporta como uno gestionado…"
 sql -qc "DROP DATABASE IF EXISTS $DB" >/dev/null
 for r in resto_app resto_auth resto_admin; do
