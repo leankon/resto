@@ -56,6 +56,9 @@ export default function Tabla({ reservas, tz }: { reservas: ReservaDelDia[]; tz:
                   </div>
                 )}
                 {r.sinContacto && <div className="pastilla alerta">no recibe avisos</div>}
+                {/* Lo que avisó el cliente al reservar: celiaquía, una sillita, un
+                    festejo. Si no se ve acá, no se ve en ningún lado. */}
+                {r.notas && <div className="nota">{r.notas}</div>}
               </td>
               <td>{r.personas}</td>
               <td>{r.mesas.join(' + ') || '—'}</td>

@@ -15,6 +15,9 @@ export default async function Horarios() {
         <span className="marca">{ctx.tenant.nombre}</span>
         <Link className="boton secundario chico" href="/panel/salon">El salón</Link>
         {esDuenio && (
+          <Link className="boton secundario chico" href="/panel/publico">Reservas web</Link>
+        )}
+        {esDuenio && (
           <Link className="boton secundario chico" href="/panel/equipo">Equipo</Link>
         )}
         <Link className="boton secundario chico" href="/panel">Volver al día</Link>

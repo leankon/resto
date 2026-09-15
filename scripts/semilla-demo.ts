@@ -31,6 +31,19 @@ const local = await altaDeLocal(admin, {
   duenio: { email: 'duenio@bardemo.test', nombre: 'Marta Dueña', password: 'bar-demo-123' },
 });
 
+// El local de demo viene con la web prendida para poder abrir el link enseguida.
+// Un local real arranca apagado: se prende cuando el salón y los horarios están.
+await admin.query(
+  `UPDATE tenants
+      SET web_publica = true,
+          direccion = 'Av. Siempreviva 742',
+          telefono_publico = '11 4567-8900',
+          descripcion = 'Cocina de barrio, parrilla a la vista, mesas en la vereda.',
+          mensaje_confirmacion = 'Te guardamos la mesa 15 minutos. Si vas a llegar más tarde, avisanos.'
+    WHERE id = $1`,
+  [local.tenantId],
+);
+
 const hoy = hoyEn(TZ);
 const actor = { tipo: 'staff' as const, id: local.usuarioId };
 const gente: Array<[string, number, string, string, string]> = [
@@ -71,5 +84,6 @@ await ocuparMesa(app, {
 console.log('\nListo.');
 console.log('  Panel:  duenio@bardemo.test / bar-demo-123');
 console.log('  Admin:  admin@plataforma.test / plataforma-123');
+console.log('  Reservas web:  http://localhost:3000/r/bar-demo');
 
 await Promise.all([admin.end(), app.end()]);

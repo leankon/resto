@@ -38,6 +38,11 @@ export interface PedidoDeReserva {
   salonPreferido?: string;
   notas?: string;
   actor: Actor;
+  /**
+   * Hash del token con el que el cliente vuelve a su reserva sin tener cuenta.
+   * Lo pone la web pública; una reserva de mostrador no lo lleva.
+   */
+  tokenHash?: string;
 }
 
 export interface MesaAsignada {
@@ -123,8 +128,9 @@ export async function crearReserva(
 
       const { rows } = await c.query(
         `INSERT INTO reservas (tenant_id, cliente_id, inicio, duracion_min, buffer_min,
-                               personas, canal_origen, notas, creada_por_usuario_id)
-         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9) RETURNING id`,
+                               personas, canal_origen, notas, creada_por_usuario_id,
+                               token_hash)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10) RETURNING id`,
         [
           tenant.id,
           cliente.id,
@@ -135,6 +141,7 @@ export async function crearReserva(
           pedido.canalOrigen,
           pedido.notas ?? null,
           pedido.actor.tipo === 'staff' ? (pedido.actor.id ?? null) : null,
+          pedido.tokenHash ?? null,
         ],
       );
       const reservaId = rows[0].id as string;

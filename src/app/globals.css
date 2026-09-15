@@ -170,3 +170,59 @@ tr.pasada td { color: var(--suave); }
 .dia input:checked + span {
   background: var(--acento); border-color: var(--acento); color: #fff; font-weight: 600;
 }
+
+/* --- La página pública del local --- */
+
+.publico { max-width: 640px; margin: 0 auto; padding: 24px 20px 60px; }
+.publico.compacto { padding: 16px; max-width: none; }
+
+.portada { margin-bottom: 22px; }
+.portada h1 { font-size: 26px; margin: 0 0 6px; letter-spacing: -.01em; }
+.portada .datos { color: var(--suave); font-size: 14px; }
+.portada .datos span + span::before { content: "·"; margin: 0 8px; }
+.portada .descripcion { margin-top: 10px; color: var(--suave); }
+
+.paso { display: flex; align-items: baseline; gap: 8px; margin: 0 0 14px; font-size: 15px; }
+.paso .numero {
+  display: inline-flex; align-items: center; justify-content: center;
+  width: 22px; height: 22px; flex: none; border-radius: 999px;
+  background: var(--acento-suave); color: var(--acento);
+  font-size: 12px; font-weight: 650;
+}
+
+.horarios { display: flex; flex-wrap: wrap; gap: 8px; }
+.horarios a, .horarios span {
+  display: inline-block; min-width: 68px; padding: 9px 12px; text-align: center;
+  border: 1px solid var(--borde); border-radius: 6px; background: #fff;
+  text-decoration: none; color: var(--texto); font-variant-numeric: tabular-nums;
+}
+.horarios a:hover { border-color: var(--acento); color: var(--acento); }
+.horarios a[aria-current="true"] {
+  background: var(--acento); border-color: var(--acento); color: #fff;
+}
+.horarios span { color: #b9b4ac; text-decoration: line-through; background: #f7f6f4; }
+
+.servicio { margin: 16px 0 8px; font-size: 13px; color: var(--suave); font-weight: 600; }
+.servicio:first-child { margin-top: 0; }
+
+.resumen {
+  display: flex; flex-wrap: wrap; gap: 4px 14px; padding: 12px 14px; margin-bottom: 16px;
+  background: var(--acento-suave); border-radius: var(--radio); color: var(--acento);
+}
+.resumen b { font-weight: 650; }
+
+.pie { margin-top: 28px; text-align: center; font-size: 12px; color: var(--suave); }
+.pie a { color: var(--suave); }
+
+.snippet {
+  display: block; width: 100%; padding: 12px; font-size: 12.5px;
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  background: #f7f6f4; border: 1px solid var(--borde); border-radius: 6px;
+  white-space: pre; overflow-x: auto; color: var(--texto);
+}
+
+/* Lo que avisó el cliente al reservar. Va resaltado porque le sirve a la cocina. */
+.nota {
+  margin-top: 4px; padding: 3px 8px; border-radius: 6px;
+  background: #fdf8ec; border: 1px solid #efe3c7; color: #6b5a2e; font-size: 13px;
+}

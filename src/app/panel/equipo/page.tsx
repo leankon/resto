@@ -13,6 +13,7 @@ export default async function EquipoDelLocal() {
         <span className="marca">{ctx.tenant.nombre}</span>
         <Link className="boton secundario chico" href="/panel/salon">El salón</Link>
         <Link className="boton secundario chico" href="/panel/horarios">Horarios</Link>
+        <Link className="boton secundario chico" href="/panel/publico">Reservas web</Link>
         <Link className="boton secundario chico" href="/panel">Volver al día</Link>
       </header>
 

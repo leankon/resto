@@ -30,7 +30,10 @@ export default async function Salon({
         <span className="marca">{ctx.tenant.nombre}</span>
         <Link className="boton secundario chico" href="/panel/horarios">Horarios</Link>
         {esDuenio && (
-          <Link className="boton secundario chico" href="/panel/equipo">Equipo</Link>
+          <>
+            <Link className="boton secundario chico" href="/panel/publico">Reservas web</Link>
+            <Link className="boton secundario chico" href="/panel/equipo">Equipo</Link>
+          </>
         )}
         <Link className="boton secundario chico" href="/panel">Volver al día</Link>
       </header>

@@ -171,3 +171,48 @@ y llegan en Fase 2.
 Si cuando me pases el plano resulta que las posiciones exactas son un problema, el
 fallback es agrupar mesas por sector (`ventana`, `fondo`, `barra`) y permitir unir dentro
 del mismo sector. Pierde el matiz de "a qué distancia", pero no requiere coordenadas.
+
+## D11 — El comensal no se registra: la reserva se abre con un link
+
+El brief es explícito en que el cliente final nunca crea una cuenta. Pero después de
+reservar tiene que poder volver a su reserva: para verla, y sobre todo para cancelarla.
+
+La solución es un **link con un token al azar de 256 bits**. Quien tiene el link puede
+ver y cancelar esa reserva y ninguna otra. No hay contraseña que recordar, ni mail de
+verificación, ni un "olvidé mi contraseña" que mantener.
+
+En la base se guarda **solo el hash del token**, igual que con las sesiones del staff:
+con una copia de la base robada no se puede cancelar la cena de nadie. La consecuencia
+práctica es que el token existe una sola vez, en el momento de crearlo. Emitir uno nuevo
+—para reenviar el link por mail en la Fase 3— **invalida el anterior**, que es lo correcto
+si el primero se mandó a la dirección equivocada.
+
+**Lo que se resigna:** alguien que reenvía el link se lo pasa a otra persona, y esa otra
+persona puede cancelar. Es aceptable: el daño máximo es perder una mesa, no una cuenta,
+y el local ve la cancelación en su planilla con el motivo registrado.
+
+## D12 — La web pública arranca apagada
+
+Un local recién dado de alta tiene `web_publica = false`. El link existe pero muestra el
+teléfono en lugar del formulario.
+
+Es deliberado: entre que se crea el local y que se carga el salón con sus mesas y los
+horarios reales, hay horas o días. Una página que acepta reservas en ese intervalo las
+asigna contra un salón de ejemplo, y el primer cliente real llega a un local que no sabe
+que lo espera. Prenderla es un checkbox, y la pantalla dice qué falta.
+
+## D13 — Cuatro límites de cara al público, y ninguno más
+
+La página pública no es un panel de administración. Lo que el local decide es:
+
+| Límite | Por defecto | Para qué |
+|---|---|---|
+| Anticipación mínima | 60 min | Que la cocina se entere antes de que la gente esté en la puerta |
+| Plazo máximo | 60 días | No tomar reservas para un menú que todavía no existe |
+| Grupo más grande | 10 | Un grupo de 20 se arma hablando, no con un formulario |
+| Cancelar hasta | 120 min antes | Cerca de la hora ya se compró la mercadería |
+
+Todo lo demás —qué horarios se ofrecen, cuánto dura el turno, qué mesa toca— sale de la
+configuración que ya existe. **La grilla de horarios corre el mismo motor que una reserva
+real**, mesa por mesa: si la web ofreciera horarios con un criterio propio, el cliente
+elegiría uno que después el motor rechaza, y se enteraría recién con los datos cargados.

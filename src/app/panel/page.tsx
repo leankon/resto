@@ -47,7 +47,10 @@ export default async function Panel({ searchParams }: { searchParams: Parametros
           </>
         )}
         {esDuenio && (
-          <Link className="boton secundario chico" href="/panel/equipo">Equipo</Link>
+          <>
+            <Link className="boton secundario chico" href="/panel/publico">Reservas web</Link>
+            <Link className="boton secundario chico" href="/panel/equipo">Equipo</Link>
+          </>
         )}
         <span className="quien">{ctx.sesion.nombre}</span>
         <form action={salir}>

@@ -339,3 +339,93 @@ export async function renombrarLocal(
   );
   return { tipo: 'ok' };
 }
+
+export interface DatosPublicos {
+  webPublica: boolean;
+  direccion: string;
+  telefonoPublico: string;
+  descripcion: string;
+  anticipacionMin: number;
+  diasMaxAnticipacion: number;
+  personasMaxWeb: number;
+  cancelacionMin: number;
+  mensajeConfirmacion: string;
+}
+
+export async function cargarDatosPublicos(
+  pool: pg.Pool,
+  tenantId: string,
+): Promise<DatosPublicos & { slug: string }> {
+  return conTenant(pool, tenantId, async (c) => {
+    const { rows } = await c.query(
+      `SELECT slug, web_publica, direccion, telefono_publico, descripcion,
+              anticipacion_min, dias_max_anticipacion, personas_max_web,
+              cancelacion_min, mensaje_confirmacion
+         FROM tenants WHERE id = $1`,
+      [tenantId],
+    );
+    const f = rows[0];
+    return {
+      slug: f.slug,
+      webPublica: f.web_publica,
+      direccion: f.direccion ?? '',
+      telefonoPublico: f.telefono_publico ?? '',
+      descripcion: f.descripcion ?? '',
+      anticipacionMin: f.anticipacion_min,
+      diasMaxAnticipacion: f.dias_max_anticipacion,
+      personasMaxWeb: f.personas_max_web,
+      cancelacionMin: f.cancelacion_min,
+      mensajeConfirmacion: f.mensaje_confirmacion ?? '',
+    };
+  });
+}
+
+/**
+ * Guarda lo que el local muestra y acepta de cara al público.
+ *
+ * Los límites se validan acá además de en la base: un CHECK rechazando la escritura le
+ * muestra al dueño un error de Postgres, no una explicación.
+ */
+export async function guardarDatosPublicos(
+  pool: pg.Pool,
+  tenantId: string,
+  datos: DatosPublicos,
+): Promise<ResultadoConfig> {
+  const entero = (valor: number, min: number, max: number, campo: string) => {
+    if (!Number.isInteger(valor) || valor < min || valor > max) {
+      return `${campo} tiene que ser un número entre ${min} y ${max}.`;
+    }
+    return null;
+  };
+  const motivo =
+    entero(datos.anticipacionMin, 0, 43200, 'La anticipación mínima') ??
+    entero(datos.diasMaxAnticipacion, 1, 365, 'El plazo máximo') ??
+    entero(datos.personasMaxWeb, 1, 100, 'El grupo más grande') ??
+    entero(datos.cancelacionMin, 0, 43200, 'El plazo para cancelar');
+  if (motivo) return { tipo: 'invalido', motivo };
+
+  const vacioEsNulo = (texto: string) => texto.trim() || null;
+
+  await conTenant(pool, tenantId, (c) =>
+    c.query(
+      `UPDATE tenants
+          SET web_publica = $2, direccion = $3, telefono_publico = $4, descripcion = $5,
+              anticipacion_min = $6, dias_max_anticipacion = $7, personas_max_web = $8,
+              cancelacion_min = $9, mensaje_confirmacion = $10, actualizado_en = now()
+        WHERE id = $1`,
+      [
+        tenantId,
+        datos.webPublica,
+        vacioEsNulo(datos.direccion),
+        vacioEsNulo(datos.telefonoPublico),
+        vacioEsNulo(datos.descripcion),
+        datos.anticipacionMin,
+        datos.diasMaxAnticipacion,
+        datos.personasMaxWeb,
+        datos.cancelacionMin,
+        vacioEsNulo(datos.mensajeConfirmacion),
+      ],
+    ),
+  );
+  return { tipo: 'ok' };
+}

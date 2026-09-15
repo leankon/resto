@@ -17,12 +17,13 @@ npm run db:demo      # carga un local de prueba con reservas
 npm run db:migrar    # aplica migraciones pendientes (necesita DATABASE_URL_OWNER)
 npm run dev          # panel en http://localhost:3000
 
-npm test             # 107 tests
+npm test             # 197 tests
 npm run test:unit    # solo el motor, sin base de datos
 npm run humo         # recorrido de humo en navegador (requiere el server andando)
 npm run humo:salon     # recorrido de humo sobre la carga del salón
 npm run humo:horarios  # recorrido de humo sobre horarios y turnos
 npm run humo:equipo    # recorrido de humo sobre el equipo y los permisos
+npm run humo:publico   # recorrido de humo sobre la web pública y el widget
 ```
 
 Usuarios de prueba que deja `db:demo`:
@@ -31,6 +32,9 @@ Usuarios de prueba que deja `db:demo`:
 |---|---|---|
 | Panel del local (`/login`) | `duenio@bardemo.test` | `bar-demo-123` |
 | Plataforma (`/admin/login`) | `admin@plataforma.test` | `plataforma-123` |
+
+La página pública del local de demo queda en `/r/bar-demo`. No pide usuario: es la que
+ve alguien de la calle.
 
 ## Estado
 
@@ -48,7 +52,19 @@ Usuarios de prueba que deja `db:demo`:
 - **El día**: planilla con el historial de cada cliente, alta de reservas de mostrador,
   walk-ins, llegadas y ausencias, y cambio de mesa a mano con auditoría.
 
-Sigue la Fase 2: web pública de reservas y widget embebible.
+**Fase 2 en curso.** El local ya toma reservas de la calle:
+
+- **La página del local** (`/r/<local>`): elegir día y cantidad, ver los horarios que
+  tienen lugar de verdad, y reservar dejando nombre y teléfono. Sin cuenta, sin seña.
+- **El widget**: una línea de `<script>` mete el mismo formulario adentro de la web del
+  local, ajustándose solo al alto que necesita.
+- **La reserva del cliente** (`/r/<local>/reserva/<token>`): vuelve a su reserva con el
+  link que le quedó, y cancela desde ahí. La mesa se libera en el acto.
+- **Reservas web** (`/panel/publico`): prender o apagar la página, los datos que se
+  muestran y los cuatro límites con los que el local acepta reservas de gente que no
+  conoce.
+
+Falta de la Fase 2: la vista visual del salón con reasignación arrastrando.
 
 ## Cómo está organizado
 
