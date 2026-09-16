@@ -362,3 +362,26 @@ tr.pasada td { color: var(--suave); }
   width: 30px; height: 30px; flex: none; border-radius: 50%;
   background: var(--acento); color: #fff; font-size: 16px; font-family: system-ui;
 }
+
+/* --- La portada de la plataforma --- */
+
+.portada-plataforma { max-width: 680px; }
+.portada-plataforma .marca-chica {
+  margin: 0 0 20px; font-family: var(--titulos);
+  font-size: 19px; font-weight: 700; letter-spacing: -.01em; color: var(--acento);
+}
+.portada-plataforma .portada { padding-top: 56px; }
+.portada-plataforma .portada h1 { max-width: 16ch; }
+.portada-plataforma .portada .descripcion { font-size: 17.5px; max-width: 52ch; margin-top: 18px; }
+.portada-plataforma .boton { padding: 12px 22px; border-radius: 10px; font-weight: 600; }
+
+.que-hace { display: grid; gap: 14px; margin-top: 12px; }
+@media (min-width: 620px) { .que-hace { grid-template-columns: 1fr 1fr; } }
+.que-hace article {
+  padding: 20px; background: var(--panel);
+  border: 1px solid var(--borde-suave); border-radius: 14px;
+}
+.que-hace h2 {
+  margin: 0 0 8px; font-size: 16px; font-weight: 650; letter-spacing: -.005em;
+}
+.que-hace p { margin: 0; color: var(--suave); font-size: 14.5px; line-height: 1.6; }

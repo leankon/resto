@@ -294,3 +294,41 @@ perdería justo el día que más le importa.
 de minutos desde la medianoche. Es más largo de escribir y es lo correcto: el día en que
 cambia la hora, un tramo de 20:00 a 02:00 no dura seis horas, y la aritmética de minutos no
 tiene manera de enterarse.
+
+## D18 — El SEO es de cada local, no de la plataforma
+
+Salir primero por "restaurante" o por "resto" no es alcanzable: son palabras genéricas y
+del otro lado están TripAdvisor, Google Maps y millones de páginas. Perseguirlo es tirar
+tiempo.
+
+Lo que sí se puede, y vale más: que **cuando alguien busque el nombre de un local,
+aparezca su página de reservas**. Ahí no hay competencia, y la visita que llega ya quiere
+reservar en ese lugar. Por eso todo lo que se declara apunta al local —su nombre, su
+dirección, su teléfono, su horario, su acción de reservar— y no a la plataforma.
+
+Cómo está armado:
+
+| Qué | Dónde | Para qué |
+|---|---|---|
+| `Restaurant` + `ReserveAction` | en la página de cada local | Google muestra horario y acceso a reservar, no un link pelado |
+| Open Graph y canónico | `/r/<local>` | el link se ve bien pegado en WhatsApp o Instagram |
+| `sitemap.xml` | raíz | le dice a Google qué páginas existen |
+| `robots.txt` | raíz | y cuáles no mirar |
+| Portada de la plataforma | `/` | para la marca; quien tiene sesión sigue entrando derecho al panel |
+
+**El horario estructurado sale de las mismas franjas que usa el motor.** No es una copia
+que se desactualiza: si el local cambia su horario, cambia lo que ve Google.
+
+Dos cosas quedan fuera del índice a propósito:
+
+- **El widget** (`/r/<local>/widget`), porque duplicaría el contenido de la página del
+  local y Google penaliza eso.
+- **La reserva de cada cliente** (`/r/<local>/reserva/<token>`), porque su URL **es** la
+  credencial que la abre (D11). Indexarla sería publicarla.
+
+Un local con la web apagada tampoco se indexa: su página muestra el teléfono en vez del
+formulario, y mandarle una visita a eso es gastarla.
+
+**Lo que no puede hacer el código:** verificar el dominio en Google Search Console. Eso lo
+tiene que hacer una persona con acceso a la cuenta, una sola vez, y recién ahí conviene
+mandarle el sitemap.

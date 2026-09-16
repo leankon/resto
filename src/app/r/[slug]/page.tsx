@@ -1,6 +1,8 @@
 import { notFound } from 'next/navigation';
 import { poolAuth } from '../../../web/contexto';
-import { localPorSlug } from '../../../servicios/publico';
+import { datosParaGoogle, localPorSlug } from '../../../servicios/publico';
+import { poolApp } from '../../../web/contexto';
+import { origen } from '../../../web/origen';
 import ReservasPublicas, { type Parametros } from './reservas-publicas';
 
 export default async function PaginaDelLocal({
@@ -14,8 +16,17 @@ export default async function PaginaDelLocal({
   const local = await localPorSlug(poolAuth(), slug);
   if (!local) notFound();
 
+  const url = `${await origen()}/r/${local.slug}`;
+  const paraGoogle = await datosParaGoogle(poolApp(), local, url);
+
   return (
     <main className="publico">
+      {/* Lo que hace que, buscando el nombre del local, Google muestre su horario y un
+          acceso a reservar en vez de un link pelado. */}
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{ __html: JSON.stringify(paraGoogle) }}
+      />
       <header className="portada">
         <h1>{local.nombre}</h1>
         <p className="datos">

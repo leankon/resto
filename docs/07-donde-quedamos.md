@@ -19,19 +19,14 @@ Fase 1 y Fase 2 completas y desplegadas. Además, en esta tanda:
 Nada de la parte funcional. La vista de la semana quedó terminada: grilla de siete días
 con las horas editables una por una, cerrar un día, y reabrirlo copiando de otro.
 
-## Lo pendiente acordado
+## Lo pendiente
 
-- **Google.** Posicionar por la palabra "resto" no es posible: es genérica y compite con
-  TripAdvisor y Google Maps. Lo que sí sirve, y es lo que hay que hacer:
-  - Que la página de cada local aparezca cuando se googlea **ese local**: datos
-    estructurados de restaurante, Open Graph para que el link se vea bien en WhatsApp e
-    Instagram, `sitemap.xml` y `robots.txt`. No necesita nada de nadie, se puede hacer ya.
-  - Una página de marca de la plataforma. El repo de referencia
-    (`RamiroLangsam/irupe-code`) hace exactamente esto: verificación de Search Console,
-    sitemap, OG y JSON-LD. Sale primero porque "irupe code" es un nombre propio y no
-    compite con nadie; "resto" no tiene esa ventaja.
-- **Diseño.** Hecho en la página pública. Si hay que seguir, el panel es el siguiente:
-  funciona bien pero es denso, y eso ahí está bien; lo que le falta es respirar un poco.
+Una sola cosa, y no la puede hacer el código: **verificar el dominio en Google Search
+Console**. Entrás con la cuenta de Google, agregás la propiedad, y ahí le mandás
+`https://<tu-dominio>/sitemap.xml`. Se hace una vez.
+
+Conviene hacerlo recién cuando el dominio sea el definitivo: verificar la URL de prueba de
+Vercel y después mudarse obliga a repetirlo.
 
 ## Decisiones que ya tomó el dueño y no hay que volver a preguntar
 

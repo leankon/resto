@@ -347,3 +347,89 @@ export async function cancelarPorToken(
     return { tipo: 'cancelada' as const };
   });
 }
+
+const DIA_SCHEMA = [
+  'https://schema.org/Sunday',
+  'https://schema.org/Monday',
+  'https://schema.org/Tuesday',
+  'https://schema.org/Wednesday',
+  'https://schema.org/Thursday',
+  'https://schema.org/Friday',
+  'https://schema.org/Saturday',
+];
+
+/**
+ * Los datos del local en el formato que entiende Google (schema.org/Restaurant).
+ *
+ * Es lo que hace que, buscando el nombre del local, aparezca con su dirección, su
+ * teléfono, su horario y un acceso directo a reservar, en vez de un link pelado. Sale de
+ * la misma configuración que usa el motor, así que no puede quedar desactualizado: si el
+ * local cambia su horario, cambia acá.
+ *
+ * `ReserveAction` es la que le dice a Google que en esta página se reserva. Sin ella, la
+ * página es una ficha más; con ella, es el lugar donde se hace algo.
+ */
+export async function datosParaGoogle(
+  pool: pg.Pool,
+  local: LocalPublico,
+  url: string,
+): Promise<Record<string, unknown>> {
+  const horarios = await conTenant(pool, local.id, async (c) => {
+    const tenant = await cargarTenant(c, local.id);
+    const config = await cargarConfigTurnos(c, tenant);
+    return config.franjas.map((f) => ({
+      '@type': 'OpeningHoursSpecification',
+      dayOfWeek: f.dias.map((d) => DIA_SCHEMA[d]),
+      opens: f.desde,
+      closes: f.hasta,
+    }));
+  });
+
+  return {
+    '@context': 'https://schema.org',
+    '@type': 'Restaurant',
+    name: local.nombre,
+    url,
+    ...(local.descripcion ? { description: local.descripcion } : {}),
+    ...(local.telefonoPublico ? { telephone: local.telefonoPublico } : {}),
+    ...(local.direccion
+      ? {
+          address: {
+            '@type': 'PostalAddress',
+            streetAddress: local.direccion,
+            addressCountry: local.pais,
+          },
+        }
+      : {}),
+    ...(horarios.length > 0 ? { openingHoursSpecification: horarios } : {}),
+    acceptsReservations: local.webPublica,
+    ...(local.webPublica
+      ? {
+          potentialAction: {
+            '@type': 'ReserveAction',
+            target: {
+              '@type': 'EntryPoint',
+              urlTemplate: url,
+              inLanguage: 'es-AR',
+              actionPlatform: [
+                'https://schema.org/DesktopWebPlatform',
+                'https://schema.org/MobileWebPlatform',
+              ],
+            },
+            result: { '@type': 'FoodEstablishmentReservation', name: `Reserva en ${local.nombre}` },
+          },
+        }
+      : {}),
+  };
+}
+
+/** Los locales con su página prendida. Es lo que va al sitemap. */
+export async function localesPublicados(
+  poolAuth: pg.Pool,
+): Promise<Array<{ slug: string; actualizadoEn: Date }>> {
+  const { rows } = await poolAuth.query(
+    `SELECT slug, actualizado_en FROM tenants
+      WHERE estado = 'activo' AND web_publica ORDER BY slug`,
+  );
+  return rows.map((f) => ({ slug: f.slug, actualizadoEn: f.actualizado_en }));
+}

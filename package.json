@@ -22,7 +22,8 @@
     "humo:horarios": "node scripts/humo-horarios.mjs",
     "humo:equipo": "node scripts/humo-equipo.mjs",
     "humo:publico": "node scripts/humo-publico.mjs",
-    "humo:plano": "node scripts/humo-plano.mjs"
+    "humo:plano": "node scripts/humo-plano.mjs",
+    "humo:google": "node scripts/humo-google.mjs"
   },
   "devDependencies": {
     "@types/pg": "^8.23.1",

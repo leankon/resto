@@ -25,6 +25,7 @@ npm run humo:horarios  # recorrido de humo sobre horarios y turnos
 npm run humo:equipo    # recorrido de humo sobre el equipo y los permisos
 npm run humo:publico   # recorrido de humo sobre la web pública y el widget
 npm run humo:plano     # recorrido de humo sobre el salón en vivo y la reasignación
+npm run humo:google    # recorrido de humo sobre lo que ve Google
 ```
 
 Cada recorrido de humo deja la base cambiada (carga reservas, mueve mesas, marca
@@ -75,6 +76,11 @@ ve alguien de la calle.
   una libre mueve la reserva entera. Solo se ofrecen las mesas que aguantan el turno
   completo: una mesa libre a las 21:00 pero tomada a las 21:15 no sirve, y ofrecerla
   sería mandar al mozo a un rechazo con el cliente esperando.
+
+- **Para que la encuentren**: la página de cada local se declara como restaurante, con su
+  dirección, su teléfono, su horario y su acción de reservar, más `sitemap.xml` y
+  `robots.txt`. El objetivo es aparecer cuando alguien busca **ese local** por su nombre;
+  competir por "restaurante" no es alcanzable ([D18](docs/00-decisiones.md)).
 
 **Fase 2 completa.** Sigue la Fase 3: lista de espera, recordatorios y bot de WhatsApp.
 
