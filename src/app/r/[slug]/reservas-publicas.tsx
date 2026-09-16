@@ -127,9 +127,8 @@ export default async function ReservasPublicas({
                   h.hayLugar ? (
                     <Link
                       key={h.hora}
-                      href={conParams({ hora: h.hora })}
+                      href={`${conParams({ hora: h.hora })}#datos`}
                       aria-current={h.hora === horaElegida}
-                      scroll={false}
                     >
                       {h.hora}
                     </Link>
@@ -151,7 +150,7 @@ export default async function ReservasPublicas({
       </section>
 
       {elegido && (
-        <section className="tarjeta">
+        <section className="tarjeta" id="datos">
           <p className="paso">
             <span className="numero">3</span> Tus datos
           </p>

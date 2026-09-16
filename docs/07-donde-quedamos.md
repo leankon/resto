@@ -30,8 +30,8 @@ con las horas editables una por una, cerrar un día, y reabrirlo copiando de otr
     (`RamiroLangsam/irupe-code`) hace exactamente esto: verificación de Search Console,
     sitemap, OG y JSON-LD. Sale primero porque "irupe code" es un nombre propio y no
     compite con nadie; "resto" no tiene esa ventaja.
-- **Diseño.** Hay que definir si se arranca por maquetas o derecho al código. La página
-  pública es la que más lo necesita: es la que ve el cliente del restaurante.
+- **Diseño.** Hecho en la página pública. Si hay que seguir, el panel es el siguiente:
+  funciona bien pero es denso, y eso ahí está bien; lo que le falta es respirar un poco.
 
 ## Decisiones que ya tomó el dueño y no hay que volver a preguntar
 

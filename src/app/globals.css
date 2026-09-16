@@ -5,7 +5,13 @@
   --texto: #1c1a17;
   --suave: #6b665e;
   --acento: #1f5f4b;
+  --acento-oscuro: #17483a;
+  --acento-claro: #4d9179;
   --acento-suave: #e8f1ed;
+  /* Más claro que --borde: en la página pública los recuadros no tienen que
+     competir con el contenido. */
+  --borde-suave: #ece7de;
+  --titulos: var(--fuente-titulos, Georgia, 'Times New Roman', serif);
   --alerta: #9a3412;
   --alerta-suave: #fdf0e8;
   --radio: 8px;
@@ -171,60 +177,132 @@ tr.pasada td { color: var(--suave); }
   background: var(--acento); border-color: var(--acento); color: #fff; font-weight: 600;
 }
 
-/* --- La página pública del local --- */
+/* --- La página pública del local ---------------------------------------------
+   Es la única pantalla que ve el cliente del restaurante, y la que decide si
+   reserva o cierra la pestaña. Por eso tiene aire, tipografía propia y un solo
+   camino visible; el panel puede ser denso, esto no.                          */
 
-.publico { max-width: 640px; margin: 0 auto; padding: 24px 20px 60px; }
-.publico.compacto { padding: 16px; max-width: none; }
+.publico {
+  max-width: 620px;
+  margin: 0 auto;
+  padding: 0 20px 72px;
+}
+.publico.compacto { padding: 4px 16px 24px; max-width: none; }
 
-.portada { margin-bottom: 22px; }
-.portada h1 { font-size: 26px; margin: 0 0 6px; letter-spacing: -.01em; }
-.portada .datos { color: var(--suave); font-size: 14px; }
-.portada .datos span + span::before { content: "·"; margin: 0 8px; }
-.portada .descripcion { margin-top: 10px; color: var(--suave); }
+/* Franja de color arriba de todo: da identidad sin pedirle un logo al local. */
+.publico::before {
+  content: "";
+  position: fixed; inset: 0 0 auto; height: 4px; z-index: 2;
+  background: linear-gradient(90deg, var(--acento), var(--acento-claro));
+}
+.publico.compacto::before { display: none; }
 
-.paso { display: flex; align-items: baseline; gap: 8px; margin: 0 0 14px; font-size: 15px; }
+.portada { padding: 44px 0 28px; }
+.portada h1 {
+  font-family: var(--titulos);
+  font-size: clamp(32px, 8vw, 44px);
+  line-height: 1.05;
+  letter-spacing: -.02em;
+  margin: 0 0 12px;
+}
+.portada .datos {
+  display: flex; flex-wrap: wrap; gap: 6px 14px;
+  margin: 0; color: var(--suave); font-size: 14px;
+}
+.portada .datos span { display: inline-flex; align-items: center; gap: 6px; }
+.portada .datos span::before {
+  content: ""; width: 4px; height: 4px; border-radius: 50%;
+  background: var(--acento); opacity: .45;
+}
+.portada .descripcion {
+  margin: 16px 0 0; max-width: 46ch;
+  font-size: 16.5px; line-height: 1.6; color: var(--suave);
+}
+
+.publico .tarjeta {
+  padding: 22px;
+  border-radius: 14px;
+  border-color: var(--borde-suave);
+  box-shadow: 0 1px 2px rgb(28 22 15 / .04), 0 8px 24px -16px rgb(28 22 15 / .18);
+  margin-bottom: 16px;
+}
+.publico.compacto .tarjeta { padding: 18px; box-shadow: none; }
+
+.paso {
+  display: flex; align-items: center; gap: 10px;
+  margin: 0 0 18px; font-size: 16px; font-weight: 600;
+}
 .paso .numero {
   display: inline-flex; align-items: center; justify-content: center;
-  width: 22px; height: 22px; flex: none; border-radius: 999px;
-  background: var(--acento-suave); color: var(--acento);
-  font-size: 12px; font-weight: 650;
+  width: 24px; height: 24px; flex: none; border-radius: 50%;
+  background: var(--acento); color: #fff;
+  font-size: 12px; font-weight: 700; font-variant-numeric: tabular-nums;
+}
+.paso + .apagado { margin-top: -10px; margin-bottom: 18px; }
+
+.publico label { font-size: 13px; font-weight: 500; color: var(--suave); }
+.publico input, .publico select, .publico textarea {
+  padding: 11px 12px; border-radius: 9px; font-size: 16px; /* 16px: el iPhone no hace zoom */
+  border-color: var(--borde-suave);
+}
+.publico input:focus, .publico select:focus, .publico textarea:focus {
+  outline: 3px solid var(--acento-suave); border-color: var(--acento);
+}
+.publico button[type="submit"] {
+  width: 100%; padding: 13px 16px; border-radius: 10px;
+  font-size: 15.5px; font-weight: 600; letter-spacing: .01em;
+}
+.publico button[type="submit"]:hover:not(:disabled) { background: var(--acento-oscuro); }
+.publico .fila button[type="submit"] {
+  width: auto; flex: 0 0 auto; padding: 11px 16px; font-weight: 500;
 }
 
-.horarios { display: flex; flex-wrap: wrap; gap: 8px; }
-.horarios a, .horarios span {
-  display: inline-block; min-width: 68px; padding: 9px 12px; text-align: center;
-  border: 1px solid var(--borde); border-radius: 6px; background: #fff;
-  text-decoration: none; color: var(--texto); font-variant-numeric: tabular-nums;
+/* Los horarios: lo más importante de la página y lo que más fácil abruma. */
+.servicio {
+  display: flex; align-items: center; gap: 10px;
+  margin: 20px 0 10px; font-size: 12px; font-weight: 700;
+  text-transform: uppercase; letter-spacing: .07em; color: var(--suave);
 }
-.horarios a:hover { border-color: var(--acento); color: var(--acento); }
-.horarios a[aria-current="true"] {
-  background: var(--acento); border-color: var(--acento); color: #fff;
+.servicio::after {
+  content: ""; flex: 1; height: 1px; background: var(--borde-suave);
 }
-.horarios span { color: #b9b4ac; text-decoration: line-through; background: #f7f6f4; }
-
-.servicio { margin: 16px 0 8px; font-size: 13px; color: var(--suave); font-weight: 600; }
 .servicio:first-child { margin-top: 0; }
 
+.horarios { display: grid; grid-template-columns: repeat(auto-fill, minmax(64px, 1fr)); gap: 6px; }
+.horarios a, .horarios span {
+  display: flex; align-items: center; justify-content: center;
+  min-height: 44px; padding: 6px 4px;  /* 44px: alcanzable con el pulgar */
+  border: 1px solid var(--borde-suave); border-radius: 9px; background: #fff;
+  text-decoration: none; color: var(--texto);
+  font-size: 14.5px; font-variant-numeric: tabular-nums;
+  transition: border-color .12s, color .12s, background .12s;
+}
+.horarios a:hover { border-color: var(--acento); color: var(--acento); background: var(--acento-suave); }
+.horarios a[aria-current="true"] {
+  background: var(--acento); border-color: var(--acento); color: #fff; font-weight: 600;
+}
+.horarios span { color: #bdb7ad; background: #faf8f5; border-style: dashed; }
+
 .resumen {
-  display: flex; flex-wrap: wrap; gap: 4px 14px; padding: 12px 14px; margin-bottom: 16px;
-  background: var(--acento-suave); border-radius: var(--radio); color: var(--acento);
+  display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 12px;
+  padding: 14px 16px; margin: 0 0 20px;
+  background: var(--acento-suave); border-radius: 11px; color: var(--acento-oscuro);
+  font-size: 15px;
 }
 .resumen b { font-weight: 650; }
 
-.pie { margin-top: 28px; text-align: center; font-size: 12px; color: var(--suave); }
-.pie a { color: var(--suave); }
+.pie {
+  margin-top: 36px; text-align: center;
+  font-size: 12.5px; color: #a49c91; letter-spacing: .01em;
+}
+.pie a { color: #a49c91; text-decoration: none; }
+.pie a:hover { color: var(--suave); }
 
 .snippet {
   display: block; width: 100%; padding: 12px; font-size: 12.5px;
   font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
   background: #f7f6f4; border: 1px solid var(--borde); border-radius: 6px;
   white-space: pre; overflow-x: auto; color: var(--texto);
-}
-
-/* Lo que avisó el cliente al reservar. Va resaltado porque le sirve a la cocina. */
-.nota {
-  margin-top: 4px; padding: 3px 8px; border-radius: 6px;
-  background: #fdf8ec; border: 1px solid #efe3c7; color: #6b5a2e; font-size: 13px;
 }
 
 /* --- El salón en vivo, con reasignación --- */
@@ -271,3 +349,16 @@ tr.pasada td { color: var(--suave); }
 .semana .tramo { gap: 8px; margin-bottom: 6px; }
 .semana .tramo > * { flex: 0 0 auto; min-width: 0; }
 .semana input[type="time"] { margin-top: 0; padding: 5px 7px; }
+
+/* La confirmación: es el momento en que el cliente decide si el local le da confianza. */
+.confirmacion h2 {
+  font-family: var(--titulos);
+  font-size: 24px; letter-spacing: -.01em; margin-bottom: 18px;
+}
+.confirmacion h2.ok { display: flex; align-items: center; gap: 10px; color: var(--acento); }
+.confirmacion h2.ok::before {
+  content: "✓";
+  display: inline-flex; align-items: center; justify-content: center;
+  width: 30px; height: 30px; flex: none; border-radius: 50%;
+  background: var(--acento); color: #fff; font-size: 16px; font-family: system-ui;
+}

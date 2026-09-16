@@ -55,8 +55,10 @@ export default async function VistaReserva({
         </header>
       )}
 
-      <section className="tarjeta">
-        <h2>{cancelada ? 'Reserva cancelada' : '¡Listo, te esperamos!'}</h2>
+      <section className="tarjeta confirmacion">
+        <h2 className={cancelada ? undefined : 'ok'}>
+          {cancelada ? 'Reserva cancelada' : '¡Listo, te esperamos!'}
+        </h2>
         <p className="resumen">
           <span>
             <b>{fechaCorta(reserva.inicio, local.tz)}</b>
@@ -85,8 +87,8 @@ export default async function VistaReserva({
         ) : (
           <>
             <p className="apagado">
-              Guardá este link: es la forma de volver a tu reserva. No hace falta ninguna
-              cuenta.
+              Guardá este link. Es la forma de volver acá si querés cambiar algo, y no
+              hace falta que te registres.
             </p>
             <Cancelar
               slug={local.slug}
