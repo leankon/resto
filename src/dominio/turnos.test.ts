@@ -29,8 +29,8 @@ describe('resolverTurno', () => {
     const pareja = resolverTurno(local('2026-09-15T21:00'), 2, config);
     const grupo = resolverTurno(local('2026-09-15T21:00'), 10, config);
 
-    expect(pareja).toMatchObject({ tipo: 'ok', duracionMin: 90, bufferMin: 15 });
-    expect(grupo).toMatchObject({ tipo: 'ok', duracionMin: 150, bufferMin: 20 });
+    expect(pareja).toMatchObject({ tipo: 'ok', duracionMin: 90, bufferMin: 0 });
+    expect(grupo).toMatchObject({ tipo: 'ok', duracionMin: 150, bufferMin: 0 });
   });
 
   it('la 00:30 del miércoles todavía es la cena del martes', () => {
@@ -147,5 +147,26 @@ describe('el día de servicio', () => {
   it('sin franjas que crucen medianoche, día de servicio y de almanaque coinciden', () => {
     const temprano = { ...config, franjas: [ALMUERZO] };
     expect(diaDeServicio(local('2026-09-16T01:00'), temprano)).toBe('2026-09-16');
+  });
+});
+
+describe('el tiempo de limpieza', () => {
+  it('arranca en cero: pasar un trapo no ocupa turno', () => {
+    // Quince minutos por turno es una mesa entera por noche a la basura, y hace que un
+    // turno de dos horas desde las 21:00 muestre la mesa ocupada a las 23:00.
+    for (const regla of reglasSembradas('almuerzo', 'cena')) {
+      expect(regla.bufferMin).toBe(0);
+    }
+  });
+
+  it('el local que necesita margen lo puede poner igual', () => {
+    const conMargen: ConfigTurnos = {
+      ...config,
+      reglas: [{ franjaId: null, personasMin: 1, personasMax: 99, duracionMin: 120, bufferMin: 30 }],
+    };
+    expect(resolverTurno(local('2026-09-15T21:00'), 4, conMargen)).toMatchObject({
+      duracionMin: 120,
+      bufferMin: 30,
+    });
   });
 });

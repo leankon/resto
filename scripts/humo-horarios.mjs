@@ -9,6 +9,20 @@ import { chromium } from 'playwright';
 
 const capturas = process.env.CAPTURAS ?? '/tmp/capturas';
 mkdirSync(capturas, { recursive: true });
+
+/**
+ * La fecha en la zona del local, no en UTC.
+ *
+ * `new Date().toISOString()` da el día UTC: pasadas las 21:00 de Buenos Aires ya
+ * devuelve el día siguiente, y el recorrido busca reservas en una planilla vacía. El
+ * fallo aparece según la hora a la que se corra, que es la peor forma de fallar.
+ */
+const TZ_LOCAL = 'America/Argentina/Buenos_Aires';
+const fechaLocal = (dias = 0) =>
+  new Intl.DateTimeFormat('en-CA', {
+    timeZone: TZ_LOCAL, year: 'numeric', month: '2-digit', day: '2-digit',
+  }).format(new Date(Date.now() + dias * 86400000));
+
 const navegador = await chromium.launch({ executablePath: '/opt/pw-browsers/chromium' });
 const pagina = await navegador.newPage({ viewport: { width: 1180, height: 1100 } });
 const errores = [];
@@ -77,7 +91,7 @@ console.log('   quedó en', guardada, guardada === '60' ? '(no se guardó el 5)'
 
 console.log('7. marcar un feriado como cerrado');
 const hoy = new Date();
-const feriado = new Date(hoy.getTime() + 3 * 86400000).toISOString().slice(0, 10);
+const feriado = fechaLocal(3);
 const altaExcepcion = pagina.locator('form').filter({ hasText: 'Motivo' });
 await altaExcepcion.locator('input[name=fecha]').fill(feriado);
 await altaExcepcion.locator('input[name=motivo]').fill('Feriado');
@@ -91,7 +105,7 @@ console.log('8. el feriado bloquea una reserva de mostrador');
 await pagina.goto('http://localhost:3000/panel/nueva');
 await pagina.waitForSelector('input[name=nombre]');
 await pagina.fill('input[name=fecha]', feriado);
-await pagina.selectOption('select[name=hora]', '21:00');
+await pagina.fill('input[name=hora]', '21:00');
 await pagina.fill('input[name=nombre]', 'Prueba Feriado');
 await pagina.fill('input[name=telefono]', '1155559090');
 await pagina.click('button[type=submit]');
@@ -99,7 +113,7 @@ await pagina.waitForSelector('.aviso');
 console.log('   ->', (await pagina.textContent('.aviso')).trim());
 
 console.log('9. un día sin feriado sigue aceptando');
-const normal = new Date(hoy.getTime() + 4 * 86400000).toISOString().slice(0, 10);
+const normal = fechaLocal(4);
 await pagina.fill('input[name=fecha]', normal);
 await pagina.click('button[type=submit]');
 await pagina.waitForTimeout(1800);

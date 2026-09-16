@@ -118,7 +118,7 @@ export async function cargarConfigTurnos(
       motivo: e.motivo as string | null,
     })),
     duracionPorDefecto: 120,
-    bufferPorDefecto: 15,
+    bufferPorDefecto: 0,
   };
 }
 

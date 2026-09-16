@@ -266,7 +266,7 @@ export function Duraciones({
         </label>
         <label className="angosto">
           Limpieza
-          <input type="number" name="bufferMin" min={0} max={120} step={5} defaultValue={15} />
+          <input type="number" name="bufferMin" min={0} max={120} step={5} defaultValue={0} />
         </label>
         <div style={{ flex: '0 0 auto' }}>
           <button type="submit" disabled={enviando}>Agregar</button>
@@ -367,7 +367,7 @@ function TodasIguales() {
       <label style={{ flex: '0 0 auto' }}>
         minutos, con limpieza de
         <input className="angosto" type="number" name="bufferMin" min={0} max={120}
-               step={5} defaultValue={15} />
+               step={5} defaultValue={0} />
       </label>
       <button type="submit" className="secundario chico" disabled={enviando}
               style={{ flex: '0 0 auto' }}>

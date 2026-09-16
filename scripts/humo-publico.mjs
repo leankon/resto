@@ -12,6 +12,20 @@ import { chromium } from 'playwright';
 const capturas = process.env.CAPTURAS ?? '/tmp/capturas';
 const BASE = process.env.BASE ?? 'http://localhost:3000';
 mkdirSync(capturas, { recursive: true });
+
+/**
+ * La fecha en la zona del local, no en UTC.
+ *
+ * `new Date().toISOString()` da el día UTC: pasadas las 21:00 de Buenos Aires ya
+ * devuelve el día siguiente, y el recorrido busca reservas en una planilla vacía. El
+ * fallo aparece según la hora a la que se corra, que es la peor forma de fallar.
+ */
+const TZ_LOCAL = 'America/Argentina/Buenos_Aires';
+const fechaLocal = (dias = 0) =>
+  new Intl.DateTimeFormat('en-CA', {
+    timeZone: TZ_LOCAL, year: 'numeric', month: '2-digit', day: '2-digit',
+  }).format(new Date(Date.now() + dias * 86400000));
+
 const navegador = await chromium.launch({ executablePath: '/opt/pw-browsers/chromium' });
 const errores = [];
 const fallas = [];
@@ -59,7 +73,7 @@ revisar((await cliente.locator('h1').textContent()).includes('Bar'), 've el nomb
 revisar(await cliente.locator('.portada .datos').textContent() !== '', 've dirección y teléfono');
 
 console.log('4. elige día y cantidad');
-const enTresDias = new Date(Date.now() + 3 * 86400000).toISOString().slice(0, 10);
+const enTresDias = fechaLocal(3);
 await cliente.fill('input[name=fecha]', enTresDias);
 await cliente.selectOption('select[name=personas]', '4');
 await cliente.getByRole('button', { name: 'Ver horarios' }).click();

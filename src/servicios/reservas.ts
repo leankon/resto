@@ -204,7 +204,7 @@ export async function ocuparMesa(
       const turno = resolverTurno(inicio, pedido.personas, await cargarConfigTurnos(c, tenant));
       // Un walk-in fuera de horario igual se registra: la gente ya está sentada.
       const duracionMin = turno.tipo === 'ok' ? turno.duracionMin : 120;
-      const bufferMin = turno.tipo === 'ok' ? turno.bufferMin : 15;
+      const bufferMin = turno.tipo === 'ok' ? turno.bufferMin : 0;
 
       const { rows } = await c.query(
         `INSERT INTO reservas (tenant_id, cliente_id, inicio, duracion_min, buffer_min,

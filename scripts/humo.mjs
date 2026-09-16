@@ -45,7 +45,7 @@ console.log(`   ${quien} ->`, (await pagina.locator('tbody tr').first().locator(
 console.log('4. solapa Terraza');
 await pagina.getByRole('link', { name: 'Terraza' }).click();
 await pagina.waitForTimeout(900);
-console.log('   mesas:', (await pagina.locator('.mesa .nombre').allTextContents()).join(', '));
+console.log('   mesas:', (await pagina.locator('.plano-vivo .ficha span').allTextContents()).join(', '));
 
 console.log('5. nueva reserva: grupo que no entra');
 await pagina.getByRole('link', { name: 'Nueva reserva' }).click();
@@ -53,21 +53,21 @@ await pagina.waitForSelector('input[name=nombre]');
 await pagina.fill('input[name=nombre]', 'Grupo Enorme');
 await pagina.fill('input[name=telefono]', '1122223333');
 await pagina.fill('input[name=personas]', '25');
-await pagina.selectOption('select[name=hora]', '21:00');
+await pagina.fill('input[name=hora]', '21:00');
 await pagina.click('button[type=submit]');
 await pagina.waitForSelector('.aviso');
 console.log('   ->', (await pagina.textContent('.aviso')).replace(/\s+/g, ' ').trim());
 
 console.log('6. nueva reserva: local cerrado');
 await pagina.fill('input[name=personas]', '2');
-await pagina.selectOption('select[name=hora]', '18:00');
+await pagina.fill('input[name=hora]', '18:00');
 await pagina.click('button[type=submit]');
 await pagina.waitForTimeout(1200);
 console.log('   ->', (await pagina.textContent('.aviso')).replace(/\s+/g, ' ').trim());
 
 console.log('7. nueva reserva sin contacto');
 await pagina.fill('input[name=telefono]', '');
-await pagina.selectOption('select[name=hora]', '21:45');
+await pagina.fill('input[name=hora]', '21:45');
 await pagina.click('button[type=submit]');
 await pagina.waitForTimeout(1200);
 console.log('   ->', (await pagina.textContent('.aviso')).replace(/\s+/g, ' ').trim());
@@ -83,7 +83,7 @@ await foto('02-nueva-reserva');
 console.log('9. la misma persona vuelve a reservar con el teléfono tipeado distinto');
 await pagina.fill('input[name=nombre]', 'Pareja Nueva');
 await pagina.fill('input[name=telefono]', '1188887777');
-await pagina.selectOption('select[name=hora]', '13:00');
+await pagina.fill('input[name=hora]', '13:00');
 await pagina.click('button[type=submit]');
 await pagina.waitForTimeout(1500);
 console.log('   ->', (await pagina.textContent('.aviso.ok')).replace(/\s+/g, ' ').trim());

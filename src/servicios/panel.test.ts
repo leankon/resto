@@ -183,6 +183,50 @@ describe('estadoDelSalon', () => {
   });
 });
 
+describe('la mesa se libera cuando termina el turno', () => {
+  it('con turnos de dos horas, el de las 21:00 deja la mesa libre a las 23:00', async () => {
+    // Es el caso que importa: si la limpieza se sumara al turno, a las 23:00 la mesa
+    // seguiría figurando ocupada y el local dejaría de vender ese horario.
+    await admin.query(
+      `UPDATE duraciones_turno SET duracion_min = 120, buffer_min = 0 WHERE tenant_id = $1`,
+      [local.tenantId],
+    );
+    const creada = await reservar('21:00');
+    if (creada.tipo !== 'creada') throw new Error('no asignó');
+    expect(creada.duracionMin).toBe(120);
+
+    const mesa = creada.mesas[0]!.nombre;
+    const alas2259 = await estadoDelSalon(app, local.tenantId, cena('22:59'));
+    const alas2300 = await estadoDelSalon(app, local.tenantId, cena('23:00'));
+
+    const buscar = (salones: Awaited<ReturnType<typeof estadoDelSalon>>) =>
+      salones.flatMap((s) => s.mesas).find((m) => m.nombre === mesa)!;
+
+    expect(buscar(alas2259).ocupadaPor).not.toBeNull();
+    expect(buscar(alas2300).ocupadaPor).toBeNull();
+  });
+
+  it('y a las 23:00 se puede sentar a otro en esa misma mesa', async () => {
+    await admin.query(
+      `UPDATE duraciones_turno SET duracion_min = 120, buffer_min = 0 WHERE tenant_id = $1`,
+      [local.tenantId],
+    );
+    const primera = await reservar('21:00');
+    if (primera.tipo !== 'creada') throw new Error('no asignó');
+
+    const segunda = await crearReserva(app, {
+      tenantId: local.tenantId,
+      inicio: cena('23:00'),
+      personas: 2, canalOrigen: 'manual', actor: STAFF,
+      contacto: { nombre: 'El de las once', telefono: '1155557777' },
+    });
+    if (segunda.tipo !== 'creada') throw new Error('no entró el segundo turno');
+
+    // La misma mesa, pegadita: es exactamente lo que el local quiere vender.
+    expect(segunda.mesas[0]!.nombre).toBe(primera.mesas[0]!.nombre);
+  });
+});
+
 describe('historial', () => {
   it('cuenta quién movió la reserva y de dónde a dónde', async () => {
     const creada = await reservar('21:00');

@@ -10,6 +10,20 @@ import { chromium } from 'playwright';
 const capturas = process.env.CAPTURAS ?? '/tmp/capturas';
 const BASE = process.env.BASE ?? 'http://localhost:3000';
 mkdirSync(capturas, { recursive: true });
+
+/**
+ * La fecha en la zona del local, no en UTC.
+ *
+ * `new Date().toISOString()` da el día UTC: pasadas las 21:00 de Buenos Aires ya
+ * devuelve el día siguiente, y el recorrido busca reservas en una planilla vacía. El
+ * fallo aparece según la hora a la que se corra, que es la peor forma de fallar.
+ */
+const TZ_LOCAL = 'America/Argentina/Buenos_Aires';
+const fechaLocal = (dias = 0) =>
+  new Intl.DateTimeFormat('en-CA', {
+    timeZone: TZ_LOCAL, year: 'numeric', month: '2-digit', day: '2-digit',
+  }).format(new Date(Date.now() + dias * 86400000));
+
 const navegador = await chromium.launch({ executablePath: '/opt/pw-browsers/chromium' });
 const errores = [];
 const fallas = [];
@@ -29,7 +43,7 @@ await pagina.fill('input[name=password]', 'bar-demo-123');
 await pagina.click('button[type=submit]');
 await pagina.waitForSelector('.marca');
 
-const hoy = new Date().toISOString().slice(0, 10);
+const hoy = fechaLocal();
 
 console.log('1. el salón se ve como plano, no como lista');
 // Con hora explícita: la que se muestra por defecto depende del reloj del local.

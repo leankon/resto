@@ -76,7 +76,7 @@ export async function duracion(_previo: string | null, datos: FormData) {
       personasMin: Number(datos.get('personasMin') ?? 1),
       personasMax: Number(datos.get('personasMax') ?? 2),
       duracionMin: Number(datos.get('duracionMin') ?? 90),
-      bufferMin: Number(datos.get('bufferMin') ?? 15),
+      bufferMin: Number(datos.get('bufferMin') ?? 0),
     },
     id || undefined,
   );
@@ -119,7 +119,7 @@ export async function duracionPareja(_previo: string | null, datos: FormData) {
     poolApp(),
     ctx.tenantId,
     Number(datos.get('duracionMin') ?? 120),
-    Number(datos.get('bufferMin') ?? 15),
+    Number(datos.get('bufferMin') ?? 0),
   );
   revalidatePath(RUTA);
   return r.tipo === 'invalido' ? r.motivo : null;

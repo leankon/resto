@@ -22,6 +22,7 @@ export interface ConfigTurnos {
   excepciones?: ExcepcionCalendario[];
   /** Último recurso si el local no configuró ninguna regla que aplique. */
   duracionPorDefecto: Minutos;
+  /** Último recurso. Cero: limpiar una mesa es pasar un trapo, no ocupa turno. */
   bufferPorDefecto: Minutos;
 }
 
@@ -127,12 +128,16 @@ export function reglasSembradas(
   franjaAlmuerzo: Id | null,
   franjaCena: Id | null,
 ): ReglaDuracion[] {
+  // El tiempo de limpieza arranca en cero a propósito: entre dos comensales se pasa un
+  // trapo y listo, no se le avisa a nadie y no se le cobra a la mesa. Reservarle quince
+  // minutos a cada turno tira una mesa entera por noche a la basura. El local que
+  // necesite margen de verdad —mantel, cubiertos, mesa larga— lo sube en el panel.
   const tramos: Array<[number, number, Minutos, Minutos, Minutos]> = [
-    // personasMin, personasMax, almuerzo, cena, buffer
-    [1, 2, 75, 90, 15],
-    [3, 4, 90, 105, 15],
-    [5, 8, 105, 120, 20],
-    [9, 99, 120, 150, 20],
+    // personasMin, personasMax, almuerzo, cena, limpieza
+    [1, 2, 75, 90, 0],
+    [3, 4, 90, 105, 0],
+    [5, 8, 105, 120, 0],
+    [9, 99, 120, 150, 0],
   ];
   const reglas: ReglaDuracion[] = [];
   for (const [min, max, almuerzo, cena, buffer] of tramos) {
