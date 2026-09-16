@@ -112,7 +112,44 @@ await pagina.click('button[type=submit]');
 await pagina.waitForSelector('.aviso');
 console.log('   ->', (await pagina.textContent('.aviso')).trim());
 
-console.log('9. un día especial que abre ANTES de lo habitual');
+console.log('9. cambiar un solo día no mueve el resto de la semana');
+await pagina.goto('http://localhost:3000/panel/horarios');
+await pagina.waitForSelector('h1');
+const semana = pagina.locator('section').filter({ hasText: 'La semana' });
+const filaDe = (nombre) => semana.locator('tbody tr').filter({ hasText: nombre });
+const cenaDe = (nombre) => filaDe(nombre).locator('form.tramo').filter({ hasText: 'Cena' });
+
+const martesAntes = await cenaDe('Martes').locator('input[name=desde]').inputValue();
+const viernes = cenaDe('Viernes');
+await viernes.locator('input[name=desde]').fill('21:30');
+await viernes.getByRole('button', { name: 'Guardar' }).click();
+await pagina.waitForTimeout(1800);
+
+const viernesDespues = await cenaDe('Viernes').locator('input[name=desde]').inputValue();
+const martesDespues = await cenaDe('Martes').locator('input[name=desde]').inputValue();
+console.log(`   viernes: ${viernesDespues} (era ${martesAntes})`);
+console.log(`   martes:  ${martesDespues}`,
+  martesDespues === martesAntes ? '(quedó como estaba)' : '(SE MOVIÓ, MAL)');
+await pagina.screenshot({ path: `${capturas}/horarios-semana.png`, fullPage: true });
+
+console.log('10. cerrar un día y reabrirlo copiando de otro');
+const lunes = () => filaDe('Lunes');
+let tramosLunes = await lunes().locator('form.tramo').count();
+for (let i = 0; i < tramosLunes; i++) {
+  await lunes().locator('form.tramo').first().getByRole('button', { name: 'Quitar' }).click();
+  await pagina.waitForTimeout(1200);
+}
+console.log('   lunes ahora:', (await lunes().textContent()).replace(/\s+/g, ' ').trim());
+
+await lunes().locator('select[name=origen]').selectOption({ label: 'Como el martes' });
+await lunes().getByRole('button', { name: 'Abrir' }).click();
+await pagina.waitForTimeout(1800);
+tramosLunes = await lunes().locator('form.tramo').count();
+const tramosMartes = await filaDe('Martes').locator('form.tramo').count();
+console.log(`   lunes reabierto con ${tramosLunes} tramos`,
+  tramosLunes === tramosMartes ? '(igual que el martes)' : '(NO COINCIDE)');
+
+console.log('11. un día especial que abre ANTES de lo habitual');
 // La cena arranca a las 20:00. Este día se abre a las 18:00, que con la regla vieja
 // —los días especiales solo recortaban— era imposible de decir.
 const especial = fechaLocal(5);
@@ -137,7 +174,7 @@ await pagina.click('button[type=submit]');
 await pagina.waitForSelector('.aviso');
 console.log('   18:30 ->', (await pagina.textContent('.aviso')).trim());
 
-console.log('10. y ese día reemplaza el horario: a las 23:30 ya no hay servicio');
+console.log('12. y ese día reemplaza el horario: a las 23:30 ya no hay servicio');
 await pagina.goto('http://localhost:3000/panel/nueva');
 await pagina.waitForSelector('input[name=nombre]');
 await pagina.fill('input[name=fecha]', especial);
@@ -148,7 +185,7 @@ await pagina.click('button[type=submit]');
 await pagina.waitForSelector('.aviso');
 console.log('   23:30 ->', (await pagina.textContent('.aviso')).trim());
 
-console.log('11. el mismo día puede tener dos tandas');
+console.log('13. el mismo día puede tener dos tandas');
 await pagina.goto('http://localhost:3000/panel/horarios');
 await pagina.waitForSelector('h1');
 const alta2 = pagina.locator('form').filter({ hasText: 'Motivo' });
@@ -164,7 +201,7 @@ const filaEspecial = pagina.locator('section').filter({ hasText: 'Días especial
 console.log('   ese día dice:', (await filaEspecial.textContent()).replace(/\s+/g, ' ').trim());
 await pagina.screenshot({ path: `${capturas}/horarios-3.png`, fullPage: true });
 
-console.log('12. un día sin nada especial sigue aceptando');
+console.log('14. un día sin nada especial sigue aceptando');
 // Autocontenido a propósito: los pasos de arriba se fueron a la pantalla de horarios,
 // y dar por sentado en qué página quedó el navegador es cómo se rompen estos recorridos.
 const normal = fechaLocal(4);

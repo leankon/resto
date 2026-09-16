@@ -17,7 +17,7 @@ npm run db:demo      # carga un local de prueba con reservas
 npm run db:migrar    # aplica migraciones pendientes (necesita DATABASE_URL_OWNER)
 npm run dev          # panel en http://localhost:3000
 
-npm test             # 207 tests
+npm test             # 257 tests
 npm run test:unit    # solo el motor, sin base de datos
 npm run humo         # recorrido de humo en navegador (requiere el server andando)
 npm run humo:salon     # recorrido de humo sobre la carga del salón
@@ -50,8 +50,9 @@ ve alguien de la calle.
   posición. Qué mesas se pueden unir lo deduce el sistema de dónde están, y lo muestra
   en el plano mientras las acomodás — con el motivo cuando dos que parecen vecinas no
   se van a unir.
-- **Horarios y turnos**: franjas de servicio, cuánto ocupa la mesa cada grupo, y días
-  especiales (feriados, horarios acotados) que el motor respeta.
+- **Horarios y turnos**: la semana día por día, cuánto ocupa la mesa cada grupo, y días
+  especiales que **reemplazan** el horario de esa fecha: pueden abrir antes de lo
+  habitual, tener dos tandas, o abrir un día en que el local normalmente cierra.
 - **El equipo**: quién entra al panel y con qué permisos. Un mozo opera el día; el salón
   y los horarios son de encargado para arriba; el equipo, solo del dueño.
 - **El día**: planilla con el historial de cada cliente, alta de reservas de mostrador,

@@ -8,10 +8,13 @@ import {
   borrarExcepcion,
   borrarFranja,
   cambiarActivaFranja,
+  cambiarHorarioDeUnDia,
+  copiarHorarioDeDia,
   guardarDuracion,
   guardarExcepcion,
   guardarFranja,
   ponerDuracionPareja,
+  quitarDiaDeFranja,
   renombrarLocal,
 } from '../../../servicios/configuracion';
 
@@ -124,5 +127,47 @@ export async function duracionPareja(_previo: string | null, datos: FormData) {
     Number(datos.get('bufferMin') ?? 0),
   );
   revalidatePath(RUTA);
+  return r.tipo === 'invalido' ? r.motivo : null;
+}
+
+/** Cambiar el horario de un solo día. Si la franja era de varios, se parte. */
+export async function horarioDeUnDia(_previo: string | null, datos: FormData) {
+  const ctx = await requerirEncargado();
+  const r = await cambiarHorarioDeUnDia(poolApp(), ctx.tenantId, {
+    franjaId: String(datos.get('franjaId') ?? ''),
+    dia: Number(datos.get('dia')) as DiaSemana,
+    desde: String(datos.get('desde') ?? ''),
+    hasta: String(datos.get('hasta') ?? ''),
+    ultimoIngreso: String(datos.get('ultimoIngreso') ?? ''),
+  });
+  revalidatePath(RUTA);
+  revalidatePath('/panel');
+  return r.tipo === 'invalido' ? r.motivo : null;
+}
+
+/** Cerrar un día: lo saca de esa franja. */
+export async function cerrarUnDia(datos: FormData): Promise<void> {
+  const ctx = await requerirEncargado();
+  await quitarDiaDeFranja(
+    poolApp(),
+    ctx.tenantId,
+    String(datos.get('franjaId') ?? ''),
+    Number(datos.get('dia')) as DiaSemana,
+  );
+  revalidatePath(RUTA);
+  revalidatePath('/panel');
+}
+
+/** Copiar el horario de otro día. Es el atajo para reabrir un día cerrado. */
+export async function copiarDia(_previo: string | null, datos: FormData) {
+  const ctx = await requerirEncargado();
+  const r = await copiarHorarioDeDia(
+    poolApp(),
+    ctx.tenantId,
+    Number(datos.get('origen')) as DiaSemana,
+    Number(datos.get('destino')) as DiaSemana,
+  );
+  revalidatePath(RUTA);
+  revalidatePath('/panel');
   return r.tipo === 'invalido' ? r.motivo : null;
 }

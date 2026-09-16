@@ -2,10 +2,12 @@
 
 import { Fragment, useActionState, useState } from 'react';
 import type {
-  DuracionConfigurada, ExcepcionConfigurada, FranjaConfigurada,
+  DiaDeLaSemana, DuracionConfigurada, ExcepcionConfigurada, FranjaConfigurada,
 } from '../../../servicios/configuracion';
 import {
   alternarFranja,
+  cerrarUnDia,
+  copiarDia,
   duracion,
   duracionPareja,
   eliminarDuracion,
@@ -14,6 +16,7 @@ import {
   excepcion,
   franja,
   guardarNombre,
+  horarioDeUnDia,
 } from './acciones';
 
 const DIAS: [number, string][] = [
@@ -433,5 +436,105 @@ function TodasIguales() {
         {enviando ? 'Aplicando…' : 'Aplicar a todos'}
       </button>
     </form>
+  );
+}
+
+/**
+ * El horario visto día por día, como el cartel de la puerta.
+ *
+ * Las franjas se guardan agrupadas ("Cena, todos los días"), que es compacto pero obliga
+ * a reconstruir mentalmente cómo queda cada día. Acá se da vuelta: siete filas.
+ *
+ * Cambiar las horas de un día que comparte franja con otros **parte la franja**: el
+ * viernes se muda a una propia y los demás días quedan como estaban. Es lo que espera
+ * quien dice "los viernes abrimos más tarde".
+ */
+export function Semana({ semana }: { semana: DiaDeLaSemana[] }) {
+  const [error, enviar, enviando] = useActionState(horarioDeUnDia, null);
+  const [errorCopia, copiar] = useActionState(copiarDia, null);
+  const aviso = error ?? errorCopia;
+
+  const abiertos = semana.filter((d) => d.tramos.length > 0);
+
+  return (
+    <>
+      {aviso && <p className="aviso">{aviso}</p>}
+      <table className="editor-mesas semana">
+        <tbody>
+          {semana.map((d) => (
+            <tr key={d.dia}>
+              <td style={{ width: 110, verticalAlign: 'top', paddingTop: 12 }}>
+                <strong>{d.nombre}</strong>
+              </td>
+              <td>
+                {d.tramos.length === 0 ? (
+                  <div className="fila" style={{ alignItems: 'center' }}>
+                    <span className="pastilla gris" style={{ flex: '0 0 auto' }}>Cerrado</span>
+                    {abiertos.length > 0 && (
+                      <form action={copiar} className="fila" style={{ flex: '0 1 auto', gap: 6 }}>
+                        <input type="hidden" name="destino" value={d.dia} />
+                        <select name="origen" defaultValue={abiertos[0]!.dia} style={{ width: 'auto' }}>
+                          {abiertos.map((o) => (
+                            <option key={o.dia} value={o.dia}>Como el {o.nombre.toLowerCase()}</option>
+                          ))}
+                        </select>
+                        <button className="secundario chico" type="submit">Abrir</button>
+                      </form>
+                    )}
+                  </div>
+                ) : (
+                  d.tramos.map((t) => (
+                    <form
+                      key={`${d.dia}-${t.franjaId}`}
+                      action={enviar}
+                      className="fila tramo"
+                      style={{ alignItems: 'center' }}
+                    >
+                      <input type="hidden" name="franjaId" value={t.franjaId} />
+                      <input type="hidden" name="dia" value={d.dia} />
+                      <span style={{ flex: '0 0 92px' }}>{t.nombre}</span>
+                      <input
+                        type="time" name="desde" defaultValue={t.desde}
+                        aria-label={`${d.nombre}, ${t.nombre}: abre`}
+                        style={{ flex: '0 0 108px' }}
+                      />
+                      <span className="apagado" style={{ flex: '0 0 auto' }}>a</span>
+                      <input
+                        type="time" name="hasta" defaultValue={t.hasta}
+                        aria-label={`${d.nombre}, ${t.nombre}: cierra`}
+                        style={{ flex: '0 0 108px' }}
+                      />
+                      <span className="apagado" style={{ flex: '0 0 auto' }}>
+                        {t.cruzaMedianoche ? 'del día siguiente · último ingreso' : '· último ingreso'}
+                      </span>
+                      <input
+                        type="time" name="ultimoIngreso" defaultValue={t.ultimoIngreso}
+                        aria-label={`${d.nombre}, ${t.nombre}: último ingreso`}
+                        style={{ flex: '0 0 108px' }}
+                      />
+                      <button className="secundario chico" type="submit" disabled={enviando}
+                              style={{ flex: '0 0 auto' }}>
+                        Guardar
+                      </button>
+                      <button
+                        className="secundario chico" type="submit" formAction={cerrarUnDia}
+                        style={{ flex: '0 0 auto' }}
+                        title={`Sacar ${t.nombre} del ${d.nombre.toLowerCase()}`}
+                      >
+                        Quitar
+                      </button>
+                    </form>
+                  ))
+                )}
+              </td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+      <p className="apagado">
+        Cambiar las horas de un día que comparte horario con otros lo separa: el resto de
+        la semana queda como estaba. Un día sin ningún tramo es un día cerrado.
+      </p>
+    </>
   );
 }

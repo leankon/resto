@@ -583,6 +583,46 @@ export async function horarioSemanal(
 }
 
 /**
+ * Pone un día en el tramo que le corresponde, reusando la franja si ya existe una igual.
+ *
+ * Sin esto, cada edición por día crea una franja nueva y la lista de "Cuándo abre" se
+ * llena de filas repetidas: "Cena lunes", "Cena viernes", "Cena el resto". Reusar es
+ * además lo correcto de fondo: dos tramos con el mismo nombre y las mismas horas son el
+ * mismo tramo, y conviene que compartan las reglas de duración.
+ */
+async function ponerDiaEnTramo(
+  c: pg.PoolClient,
+  tenantId: string,
+  dia: DiaSemana,
+  tramo: { nombre: string; desde: string; hasta: string; ultimoIngreso: string },
+): Promise<void> {
+  const { rows } = await c.query(
+    `SELECT id FROM franjas_servicio
+      WHERE tenant_id = $1 AND nombre = $2 AND desde = $3::time
+        AND hasta = $4::time AND ultimo_ingreso = $5::time
+      LIMIT 1`,
+    [tenantId, tramo.nombre, tramo.desde, tramo.hasta, tramo.ultimoIngreso],
+  );
+
+  if (rows[0]) {
+    await c.query(
+      `UPDATE franjas_servicio
+          SET dias = (SELECT array_agg(DISTINCT d ORDER BY d)
+                        FROM unnest(dias || $2::int) AS d)
+        WHERE id = $1`,
+      [rows[0].id, dia],
+    );
+    return;
+  }
+
+  await c.query(
+    `INSERT INTO franjas_servicio (tenant_id, nombre, dias, desde, hasta, ultimo_ingreso)
+     VALUES ($1, $2, ARRAY[$3::int], $4::time, $5::time, $6::time)`,
+    [tenantId, tramo.nombre, dia, tramo.desde, tramo.hasta, tramo.ultimoIngreso],
+  );
+}
+
+/**
  * Cambia el horario de UN día sin tocar los demás.
  *
  * Si la franja cubre varios días, se parte: el día que se está editando sale de la
@@ -615,6 +655,35 @@ export async function cambiarHorarioDeUnDia(
 
     const dias = rows[0].dias as number[];
     if (dias.length === 1) {
+      // Si con el horario nuevo queda igual que otra franja, el día se muda ahí y esta
+      // desaparece: si no, quedan dos filas idénticas en "Cuándo abre".
+      //
+      // Solo se borra cuando no tiene reglas de duración propias. Borrar una franja se
+      // lleva sus reglas por delante (ON DELETE CASCADE), y perder en silencio cómo rota
+      // ese día sería mucho peor que dejar una fila repetida.
+      const gemela = await c.query(
+        `SELECT f.id FROM franjas_servicio f
+          WHERE f.tenant_id = $1 AND f.id <> $2 AND f.nombre = $3
+            AND f.desde = $4::time AND f.hasta = $5::time AND f.ultimo_ingreso = $6::time
+          LIMIT 1`,
+        [tenantId, datos.franjaId, rows[0].nombre, datos.desde, datos.hasta, datos.ultimoIngreso],
+      );
+      const propias = await c.query(
+        `SELECT count(*)::int AS n FROM duraciones_turno WHERE franja_id = $1`,
+        [datos.franjaId],
+      );
+
+      if (gemela.rows[0] && propias.rows[0].n === 0) {
+        await c.query(`DELETE FROM franjas_servicio WHERE id = $1`, [datos.franjaId]);
+        await ponerDiaEnTramo(c, tenantId, datos.dia, {
+          nombre: rows[0].nombre as string,
+          desde: datos.desde,
+          hasta: datos.hasta,
+          ultimoIngreso: datos.ultimoIngreso,
+        });
+        return { tipo: 'ok' as const };
+      }
+
       await c.query(
         `UPDATE franjas_servicio SET desde = $2::time, hasta = $3::time,
                 ultimo_ingreso = $4::time
@@ -624,17 +693,17 @@ export async function cambiarHorarioDeUnDia(
       return { tipo: 'ok' as const };
     }
 
-    // La franja es de varios días: este se muda a una propia.
+    // La franja es de varios días: este se muda al tramo que le corresponda.
     await c.query(
       `UPDATE franjas_servicio SET dias = array_remove(dias, $2::int) WHERE id = $1`,
       [datos.franjaId, datos.dia],
     );
-    await c.query(
-      `INSERT INTO franjas_servicio
-         (tenant_id, nombre, dias, desde, hasta, ultimo_ingreso)
-       VALUES ($1, $2, ARRAY[$3::int], $4::time, $5::time, $6::time)`,
-      [tenantId, rows[0].nombre, datos.dia, datos.desde, datos.hasta, datos.ultimoIngreso],
-    );
+    await ponerDiaEnTramo(c, tenantId, datos.dia, {
+      nombre: rows[0].nombre as string,
+      desde: datos.desde,
+      hasta: datos.hasta,
+      ultimoIngreso: datos.ultimoIngreso,
+    });
     return { tipo: 'ok' as const };
   });
 }
@@ -708,11 +777,12 @@ export async function copiarHorarioDeDia(
       [tenantId],
     );
     for (const t of tramos) {
-      await c.query(
-        `INSERT INTO franjas_servicio (tenant_id, nombre, dias, desde, hasta, ultimo_ingreso)
-         VALUES ($1, $2, ARRAY[$3::int], $4::time, $5::time, $6::time)`,
-        [tenantId, t.nombre, destino, t.desde, t.hasta, t.ultimo_ingreso],
-      );
+      await ponerDiaEnTramo(c, tenantId, destino, {
+        nombre: t.nombre as string,
+        desde: t.desde as string,
+        hasta: t.hasta as string,
+        ultimoIngreso: t.ultimo_ingreso as string,
+      });
     }
     return { tipo: 'ok' as const };
   });

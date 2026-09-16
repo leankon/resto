@@ -16,18 +16,8 @@ Fase 1 y Fase 2 completas y desplegadas. Además, en esta tanda:
 
 ## Lo que quedó a medias
 
-**La vista de la semana.** En `src/servicios/configuracion.ts` están escritas y tipadas
-`horarioSemanal`, `cambiarHorarioDeUnDia`, `quitarDiaDeFranja` y `copiarHorarioDeDia`.
-**Nadie las llama todavía**: no hay pantalla ni tests. Falta:
-
-1. Tests de servicio, sobre todo del partido de franjas: cambiar el viernes de una franja
-   que va de martes a domingo tiene que dejar el martes como estaba.
-2. La sección "La semana" en `/panel/horarios`: siete filas, como el cartel de la puerta,
-   con las horas editables por día y un "copiar de otro día".
-3. Un paso en `humo:horarios` que cambie un solo día y verifique que los otros no se
-   movieron.
-
-Hasta que eso esté, el horario se sigue editando por franjas, que funciona.
+Nada de la parte funcional. La vista de la semana quedó terminada: grilla de siete días
+con las horas editables una por una, cerrar un día, y reabrirlo copiando de otro.
 
 ## Lo pendiente acordado
 

@@ -1,12 +1,13 @@
 import Link from 'next/link';
 import { poolApp, requerirEncargado } from '../../../web/contexto';
-import { cargarConfiguracion } from '../../../servicios/configuracion';
-import { Duraciones, Excepciones, Franjas, NombreDelLocal } from './formularios';
+import { cargarConfiguracion, horarioSemanal } from '../../../servicios/configuracion';
+import { Duraciones, Excepciones, Franjas, NombreDelLocal, Semana } from './formularios';
 
 export default async function Horarios() {
   const ctx = await requerirEncargado();
   const esDuenio = ctx.sesion.rol === 'dueño';
   const config = await cargarConfiguracion(poolApp(), ctx.tenantId);
+  const semana = await horarioSemanal(poolApp(), ctx.tenantId);
   const sinFranjasActivas = config.franjas.every((f) => !f.activa);
 
   return (
@@ -46,7 +47,19 @@ export default async function Horarios() {
         </section>
 
         <section className="tarjeta">
+          <h2>La semana</h2>
+          <p className="apagado" style={{ marginTop: -8 }}>
+            Cómo queda cada día, con las horas editables una por una.
+          </p>
+          <Semana semana={semana} />
+        </section>
+
+        <section className="tarjeta">
           <h2>Cuándo abre</h2>
+          <p className="apagado" style={{ marginTop: -8 }}>
+            Lo mismo, agrupado: una franja vale para varios días a la vez. Conviene para
+            cargar el horario de cero; para retocar un día suelto, la grilla de arriba.
+          </p>
           <Franjas franjas={config.franjas} />
         </section>
 
