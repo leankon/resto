@@ -83,6 +83,20 @@ export function Ajustes({ datos }: { datos: DatosPublicos }) {
         el de las {horaMas(datos.anticipacionMin)}.
       </p>
 
+      <label>
+        Ofrecer un horario cada
+        <select name="pasoReservaMin" defaultValue={String(datos.pasoReservaMin)}>
+          <option value="15">15 minutos</option>
+          <option value="30">media hora</option>
+          <option value="60">hora en punto</option>
+        </select>
+      </label>
+      <p className="apagado" style={{ marginTop: -4 }}>
+        Cada quince minutos le da más opciones al cliente y reparte la llegada de la
+        gente. La hora en punto concentra todo junto, que para una cocina chica a veces
+        conviene. Desde el mostrador se sigue pudiendo cargar cualquier hora.
+      </p>
+
       <div className="fila">
         <label>
           Grupo más grande por internet

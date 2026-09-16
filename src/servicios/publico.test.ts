@@ -112,6 +112,29 @@ describe('disponibilidad', () => {
     ]);
   });
 
+  it('el local elige cada cuánto ofrecer un horario', async () => {
+    const cada15 = await disponibilidad(app, local, { fecha: dia(), personas: 2 });
+    expect(cada15.horarios.map((h) => h.hora)).toContain('21:15');
+
+    await admin.query('UPDATE tenants SET paso_reserva_min = 60 WHERE id = $1', [
+      creado.tenantId,
+    ]);
+    const cadaHora = await disponibilidad(
+      app,
+      { ...local, pasoReservaMin: 60 },
+      { fecha: dia(), personas: 2 },
+    );
+    const horas = cadaHora.horarios.map((h) => h.hora);
+
+    expect(horas).toContain('21:00');
+    expect(horas).not.toContain('21:15');
+    expect(horas.every((h) => h.endsWith(':00'))).toBe(true);
+
+    await admin.query('UPDATE tenants SET paso_reserva_min = 15 WHERE id = $1', [
+      creado.tenantId,
+    ]);
+  });
+
   it('un día especial que abre antes se ofrece desde esa hora', async () => {
     // La cena del local arranca a las 20:00. Ese día abre a las 18:00, y la web tiene
     // que ofrecerlo: si no, el local anuncia un horario que su propia página no toma.

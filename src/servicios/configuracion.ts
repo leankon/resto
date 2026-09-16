@@ -436,6 +436,7 @@ export interface DatosPublicos {
   personasMaxWeb: number;
   cancelacionMin: number;
   mensajeConfirmacion: string;
+  pasoReservaMin: number;
 }
 
 export async function cargarDatosPublicos(
@@ -446,7 +447,7 @@ export async function cargarDatosPublicos(
     const { rows } = await c.query(
       `SELECT slug, web_publica, direccion, telefono_publico, descripcion,
               anticipacion_min, dias_max_anticipacion, personas_max_web,
-              cancelacion_min, mensaje_confirmacion
+              cancelacion_min, mensaje_confirmacion, paso_reserva_min
          FROM tenants WHERE id = $1`,
       [tenantId],
     );
@@ -462,6 +463,7 @@ export async function cargarDatosPublicos(
       personasMaxWeb: f.personas_max_web,
       cancelacionMin: f.cancelacion_min,
       mensajeConfirmacion: f.mensaje_confirmacion ?? '',
+      pasoReservaMin: f.paso_reserva_min,
     };
   });
 }
@@ -483,6 +485,12 @@ export async function guardarDatosPublicos(
     }
     return null;
   };
+  if (![15, 30, 60].includes(datos.pasoReservaMin)) {
+    return {
+      tipo: 'invalido',
+      motivo: 'Los horarios se pueden ofrecer cada 15, 30 o 60 minutos.',
+    };
+  }
   const motivo =
     entero(datos.anticipacionMin, 0, 43200, 'La anticipación mínima') ??
     entero(datos.diasMaxAnticipacion, 1, 365, 'El plazo máximo') ??
@@ -497,7 +505,8 @@ export async function guardarDatosPublicos(
       `UPDATE tenants
           SET web_publica = $2, direccion = $3, telefono_publico = $4, descripcion = $5,
               anticipacion_min = $6, dias_max_anticipacion = $7, personas_max_web = $8,
-              cancelacion_min = $9, mensaje_confirmacion = $10, actualizado_en = now()
+              cancelacion_min = $9, mensaje_confirmacion = $10,
+              paso_reserva_min = $11, actualizado_en = now()
         WHERE id = $1`,
       [
         tenantId,
@@ -510,8 +519,201 @@ export async function guardarDatosPublicos(
         datos.personasMaxWeb,
         datos.cancelacionMin,
         vacioEsNulo(datos.mensajeConfirmacion),
+        datos.pasoReservaMin,
       ],
     ),
   );
   return { tipo: 'ok' };
+}
+
+/** Cómo queda un día de la semana, ya resuelto. Es lo que se ve en la grilla semanal. */
+export interface DiaDeLaSemana {
+  dia: DiaSemana;
+  nombre: string;
+  tramos: Array<{
+    franjaId: string;
+    nombre: string;
+    desde: string;
+    hasta: string;
+    ultimoIngreso: string;
+    cruzaMedianoche: boolean;
+    /** La franja cubre otros días además de este. Cambiarlo acá la parte. */
+    compartida: boolean;
+  }>;
+}
+
+const NOMBRE_DIA: Record<number, string> = {
+  1: 'Lunes', 2: 'Martes', 3: 'Miércoles', 4: 'Jueves',
+  5: 'Viernes', 6: 'Sábado', 0: 'Domingo',
+};
+
+/** Se muestra de lunes a domingo, como se lee un horario pegado en la puerta. */
+const ORDEN_SEMANA: DiaSemana[] = [1, 2, 3, 4, 5, 6, 0];
+
+/**
+ * El horario visto día por día.
+ *
+ * Las franjas se guardan agrupadas ("Cena, de martes a domingo"), que es compacto pero
+ * obliga a reconstruir mentalmente cómo queda cada día. Acá se da vuelta: siete filas,
+ * como el cartel de la puerta.
+ */
+export async function horarioSemanal(
+  pool: pg.Pool,
+  tenantId: string,
+): Promise<DiaDeLaSemana[]> {
+  const config = await cargarConfiguracion(pool, tenantId);
+  const activas = config.franjas.filter((f) => f.activa);
+
+  return ORDEN_SEMANA.map((dia) => ({
+    dia,
+    nombre: NOMBRE_DIA[dia]!,
+    tramos: activas
+      .filter((f) => f.dias.includes(dia))
+      .map((f) => ({
+        franjaId: f.id,
+        nombre: f.nombre,
+        desde: f.desde,
+        hasta: f.hasta,
+        ultimoIngreso: f.ultimoIngreso,
+        cruzaMedianoche: f.cruzaMedianoche,
+        compartida: f.dias.length > 1,
+      }))
+      .sort((a, b) => aMinutos(a.desde) - aMinutos(b.desde)),
+  }));
+}
+
+/**
+ * Cambia el horario de UN día sin tocar los demás.
+ *
+ * Si la franja cubre varios días, se parte: el día que se está editando sale de la
+ * franja original y se va a una nueva con el horario nuevo. Es lo que espera quien dice
+ * "los viernes abrimos más tarde" y no quiere que eso le cambie el martes.
+ */
+export async function cambiarHorarioDeUnDia(
+  pool: pg.Pool,
+  tenantId: string,
+  datos: {
+    franjaId: string;
+    dia: DiaSemana;
+    desde: string;
+    hasta: string;
+    ultimoIngreso: string;
+  },
+): Promise<ResultadoConfig> {
+  const error = validarFranja({
+    nombre: 'x', dias: [datos.dia], desde: datos.desde,
+    hasta: datos.hasta, ultimoIngreso: datos.ultimoIngreso,
+  });
+  if (error) return { tipo: 'invalido', motivo: error };
+
+  return conTenant(pool, tenantId, async (c) => {
+    const { rows } = await c.query(
+      `SELECT nombre, dias FROM franjas_servicio WHERE id = $1 AND tenant_id = $2`,
+      [datos.franjaId, tenantId],
+    );
+    if (!rows[0]) return { tipo: 'invalido' as const, motivo: 'Esa franja ya no existe.' };
+
+    const dias = rows[0].dias as number[];
+    if (dias.length === 1) {
+      await c.query(
+        `UPDATE franjas_servicio SET desde = $2::time, hasta = $3::time,
+                ultimo_ingreso = $4::time
+          WHERE id = $1`,
+        [datos.franjaId, datos.desde, datos.hasta, datos.ultimoIngreso],
+      );
+      return { tipo: 'ok' as const };
+    }
+
+    // La franja es de varios días: este se muda a una propia.
+    await c.query(
+      `UPDATE franjas_servicio SET dias = array_remove(dias, $2::int) WHERE id = $1`,
+      [datos.franjaId, datos.dia],
+    );
+    await c.query(
+      `INSERT INTO franjas_servicio
+         (tenant_id, nombre, dias, desde, hasta, ultimo_ingreso)
+       VALUES ($1, $2, ARRAY[$3::int], $4::time, $5::time, $6::time)`,
+      [tenantId, rows[0].nombre, datos.dia, datos.desde, datos.hasta, datos.ultimoIngreso],
+    );
+    return { tipo: 'ok' as const };
+  });
+}
+
+/** Saca un día de una franja. Si era el único día, la franja se va entera. */
+export async function quitarDiaDeFranja(
+  pool: pg.Pool,
+  tenantId: string,
+  franjaId: string,
+  dia: DiaSemana,
+): Promise<ResultadoConfig> {
+  return conTenant(pool, tenantId, async (c) => {
+    await c.query(
+      `UPDATE franjas_servicio SET dias = array_remove(dias, $2::int)
+        WHERE id = $1 AND tenant_id = $3`,
+      [franjaId, dia, tenantId],
+    );
+    // Una franja sin días no se aplica nunca: dejarla ahí es basura que confunde.
+    await c.query(
+      `DELETE FROM franjas_servicio
+        WHERE id = $1 AND tenant_id = $2 AND cardinality(dias) = 0`,
+      [franjaId, tenantId],
+    );
+
+    const { rows } = await c.query(
+      `SELECT count(*)::int AS quedan FROM franjas_servicio
+        WHERE tenant_id = $1 AND activa AND $2::int = ANY(dias)`,
+      [tenantId, dia],
+    );
+    if (rows[0].quedan === 0) {
+      // No es un error: hay locales que cierran los lunes. Pero conviene decirlo.
+      return { tipo: 'ok' as const };
+    }
+    return { tipo: 'ok' as const };
+  });
+}
+
+/**
+ * Copia el horario de un día a otro.
+ *
+ * Es el atajo para "el jueves igual que el viernes": reemplaza lo que tenga el día
+ * destino por lo que tiene el de origen. Sin esto, abrir un día que estaba cerrado
+ * obliga a crear una franja desde cero acordándose de las horas del día de al lado.
+ */
+export async function copiarHorarioDeDia(
+  pool: pg.Pool,
+  tenantId: string,
+  origen: DiaSemana,
+  destino: DiaSemana,
+): Promise<ResultadoConfig> {
+  if (origen === destino) {
+    return { tipo: 'invalido', motivo: 'Es el mismo día.' };
+  }
+
+  return conTenant(pool, tenantId, async (c) => {
+    const { rows: tramos } = await c.query(
+      `SELECT nombre, desde, hasta, ultimo_ingreso FROM franjas_servicio
+        WHERE tenant_id = $1 AND activa AND $2::int = ANY(dias)`,
+      [tenantId, origen],
+    );
+    if (tramos.length === 0) {
+      return { tipo: 'invalido' as const, motivo: 'Ese día el local no abre: no hay nada que copiar.' };
+    }
+
+    await c.query(
+      `UPDATE franjas_servicio SET dias = array_remove(dias, $2::int) WHERE tenant_id = $1`,
+      [tenantId, destino],
+    );
+    await c.query(
+      `DELETE FROM franjas_servicio WHERE tenant_id = $1 AND cardinality(dias) = 0`,
+      [tenantId],
+    );
+    for (const t of tramos) {
+      await c.query(
+        `INSERT INTO franjas_servicio (tenant_id, nombre, dias, desde, hasta, ultimo_ingreso)
+         VALUES ($1, $2, ARRAY[$3::int], $4::time, $5::time, $6::time)`,
+        [tenantId, t.nombre, destino, t.desde, t.hasta, t.ultimo_ingreso],
+      );
+    }
+    return { tipo: 'ok' as const };
+  });
 }

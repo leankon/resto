@@ -19,6 +19,7 @@ export async function guardar(_previo: string | null, datos: FormData): Promise<
     personasMaxWeb: numero('personasMaxWeb'),
     cancelacionMin: numero('cancelacionMin'),
     mensajeConfirmacion: texto('mensajeConfirmacion'),
+    pasoReservaMin: numero('pasoReservaMin'),
   });
 
   revalidatePath('/panel/publico');

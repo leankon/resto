@@ -36,11 +36,13 @@ export interface LocalPublico {
   personasMaxWeb: number;
   cancelacionMin: number;
   mensajeConfirmacion: string | null;
+  /** Cada cuántos minutos se le ofrece un horario al cliente: 15, 30 o 60. */
+  pasoReservaMin: number;
 }
 
 const COLUMNAS = `id, slug, nombre, tz, pais, web_publica, direccion, telefono_publico,
                   descripcion, anticipacion_min, dias_max_anticipacion, personas_max_web,
-                  cancelacion_min, mensaje_confirmacion`;
+                  cancelacion_min, mensaje_confirmacion, paso_reserva_min`;
 
 function aLocal(f: Record<string, unknown>): LocalPublico {
   return {
@@ -58,6 +60,7 @@ function aLocal(f: Record<string, unknown>): LocalPublico {
     personasMaxWeb: f['personas_max_web'] as number,
     cancelacionMin: f['cancelacion_min'] as number,
     mensajeConfirmacion: (f['mensaje_confirmacion'] as string) ?? null,
+    pasoReservaMin: f['paso_reserva_min'] as number,
   };
 }
 
@@ -123,7 +126,12 @@ export async function disponibilidad(
   return conTenant(pool, local.id, async (c) => {
     const tenant = await cargarTenant(c, local.id);
     const config = await cargarConfigTurnos(c, tenant);
-    const delDia = horariosDelDia(entrada.fecha, entrada.personas, config);
+    const delDia = horariosDelDia(
+      entrada.fecha,
+      entrada.personas,
+      config,
+      local.pasoReservaMin,
+    );
     if (delDia.length === 0) return vacia('cerrado');
 
     // Nadie reserva para dentro de diez minutos: la cocina se entera cuando la gente
