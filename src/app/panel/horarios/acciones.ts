@@ -98,6 +98,8 @@ export async function excepcion(_previo: string | null, datos: FormData) {
     cerrado,
     desde: String(datos.get('desde') ?? '') || null,
     hasta: String(datos.get('hasta') ?? '') || null,
+    ultimoIngreso: String(datos.get('ultimoIngreso') ?? '') || null,
+    franjaId: String(datos.get('franja') ?? '') || null,
     motivo: String(datos.get('motivo') ?? '') || null,
   });
   revalidatePath(RUTA);

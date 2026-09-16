@@ -1,11 +1,13 @@
 import { describe, expect, it } from 'vitest';
 import { ALMUERZO, CENA, TZ, local } from './fixtures';
+import type { DiaSemana } from './tipos';
 import {
   corteDelDia,
   diaDeServicio,
   reglasSembradas,
   resolverTurno,
   type ConfigTurnos,
+  type ExcepcionCalendario,
 } from './turnos';
 
 const config: ConfigTurnos = {
@@ -168,5 +170,124 @@ describe('el tiempo de limpieza', () => {
       duracionMin: 120,
       bufferMin: 30,
     });
+  });
+});
+
+describe('días especiales', () => {
+  const conExcepciones = (excepciones: ExcepcionCalendario[]): ConfigTurnos => ({
+    ...config,
+    excepciones,
+  });
+
+  it('un día especial puede abrir ANTES de lo habitual', () => {
+    // El caso que antes no se podía decir: la cena arranca 20:00, pero el 21/09 se
+    // abre a las 18:00. La regla vieja solo sabía recortar.
+    const c = conExcepciones([
+      { fecha: '2026-09-15', cerrado: false, desde: '18:00', hasta: '23:00', motivo: 'Evento' },
+    ]);
+
+    expect(resolverTurno(local('2026-09-15T18:30'), 2, c)).toMatchObject({
+      tipo: 'ok',
+      franjaNombre: 'Evento',
+    });
+  });
+
+  it('y reemplaza el horario habitual, no lo suma', () => {
+    // A las 21:00 normalmente hay cena. Ese día el servicio termina a las 20:00.
+    const c = conExcepciones([
+      { fecha: '2026-09-15', cerrado: false, desde: '11:00', hasta: '20:00' },
+    ]);
+
+    expect(resolverTurno(local('2026-09-15T12:00'), 2, c)).toMatchObject({ tipo: 'ok' });
+    expect(resolverTurno(local('2026-09-15T21:00'), 2, c)).toEqual({ tipo: 'fuera_de_servicio' });
+  });
+
+  it('un día especial puede tener más de un tramo', () => {
+    const c = conExcepciones([
+      { fecha: '2026-09-15', cerrado: false, desde: '11:00', hasta: '15:00', motivo: 'Brunch' },
+      { fecha: '2026-09-15', cerrado: false, desde: '18:00', hasta: '02:00', motivo: 'Fiesta' },
+    ]);
+
+    expect(resolverTurno(local('2026-09-15T11:30'), 2, c)).toMatchObject({ franjaNombre: 'Brunch' });
+    expect(resolverTurno(local('2026-09-15T19:00'), 2, c)).toMatchObject({ franjaNombre: 'Fiesta' });
+    // Entre los dos tramos el local está cerrado.
+    expect(resolverTurno(local('2026-09-15T16:30'), 2, c)).toEqual({ tipo: 'fuera_de_servicio' });
+  });
+
+  it('puede abrir un día en el que normalmente está cerrado', () => {
+    const soloSabados = {
+      ...config,
+      franjas: [{ ...CENA, dias: [6 as DiaSemana] }],
+      // 2026-09-15 es martes: sin excepción, no abre.
+      excepciones: [
+        { fecha: '2026-09-15', cerrado: false, desde: '20:00', hasta: '01:00', motivo: 'Especial' },
+      ],
+    };
+
+    expect(resolverTurno(local('2026-09-15T21:00'), 2, soloSabados)).toMatchObject({
+      tipo: 'ok',
+      franjaNombre: 'Especial',
+    });
+  });
+
+  it('un día cerrado se explica distinto que una hora sin servicio', () => {
+    // No es lo mismo elegir mal la hora que caer un día que el local no abre.
+    const c = conExcepciones([{ fecha: '2026-09-15', cerrado: true, motivo: 'Feriado' }]);
+
+    expect(resolverTurno(local('2026-09-15T21:00'), 2, c)).toEqual({
+      tipo: 'cerrado_ese_dia',
+      motivo: 'Feriado',
+    });
+    expect(resolverTurno(local('2026-09-15T18:00'), 2, c)).toEqual({ tipo: 'fuera_de_servicio' });
+  });
+
+  it('cerrar el 25 también cierra la madrugada del 26', () => {
+    // La cena del 25 termina a las 02:00 del 26: esa reserva pertenece al 25 y está
+    // cerrada igual, aunque el reloj ya marque otro día.
+    const c = conExcepciones([{ fecha: '2026-09-15', cerrado: true, motivo: 'Navidad' }]);
+
+    expect(resolverTurno(local('2026-09-16T01:00'), 2, c)).toEqual({
+      tipo: 'cerrado_ese_dia',
+      motivo: 'Navidad',
+    });
+  });
+
+  it('el día especial usa las reglas de duración de la franja que se le indique', () => {
+    const c = conExcepciones([
+      {
+        fecha: '2026-09-15', cerrado: false, desde: '18:00', hasta: '23:00',
+        motivo: 'Evento', franjaId: 'almuerzo',
+      },
+    ]);
+    // Con la franja del almuerzo, un grupo de 4 rota en 90 y no en 105.
+    expect(resolverTurno(local('2026-09-15T18:30'), 4, c)).toMatchObject({ duracionMin: 90 });
+  });
+
+  it('sin último ingreso propio, se acepta gente hasta que cierra', () => {
+    const c = conExcepciones([
+      { fecha: '2026-09-15', cerrado: false, desde: '18:00', hasta: '23:00' },
+    ]);
+
+    expect(resolverTurno(local('2026-09-15T22:45'), 2, c)).toMatchObject({ tipo: 'ok' });
+    expect(resolverTurno(local('2026-09-15T23:00'), 2, c)).toEqual({ tipo: 'fuera_de_servicio' });
+  });
+
+  it('con último ingreso propio, corta antes', () => {
+    const c = conExcepciones([
+      {
+        fecha: '2026-09-15', cerrado: false, desde: '18:00', hasta: '23:00',
+        ultimoIngreso: '21:00',
+      },
+    ]);
+
+    expect(resolverTurno(local('2026-09-15T21:30'), 2, c)).toMatchObject({
+      tipo: 'despues_del_ultimo_ingreso',
+      ultimoIngreso: '21:00',
+    });
+  });
+
+  it('el día especial de otra fecha no toca este', () => {
+    const c = conExcepciones([{ fecha: '2026-12-26', cerrado: true, motivo: 'Cerrado' }]);
+    expect(resolverTurno(local('2026-09-15T21:00'), 2, c)).toMatchObject({ tipo: 'ok' });
   });
 });

@@ -217,3 +217,85 @@ describe('ponerDuracionPareja', () => {
     expect(config.duraciones.every((d) => d.duracionMin === 120)).toBe(true);
   });
 });
+
+describe('días especiales', () => {
+  const fecha = '2026-12-26';
+
+  it('un día puede tener dos tramos con horarios propios', async () => {
+    await guardarExcepcion(app, local.tenantId, {
+      fecha, cerrado: false, desde: '11:00', hasta: '15:00', motivo: 'Brunch',
+    });
+    await guardarExcepcion(app, local.tenantId, {
+      fecha, cerrado: false, desde: '18:00', hasta: '02:00', motivo: 'Fiesta',
+    });
+
+    const config = await cargarConfiguracion(app, local.tenantId);
+    const delDia = config.excepciones.filter((e) => e.fecha === fecha);
+    expect(delDia).toHaveLength(2);
+    expect(delDia.map((e) => e.motivo)).toEqual(['Brunch', 'Fiesta']);
+  });
+
+  it('marcar cerrado borra los tramos de esa fecha', async () => {
+    await guardarExcepcion(app, local.tenantId, {
+      fecha, cerrado: false, desde: '11:00', hasta: '15:00',
+    });
+    await guardarExcepcion(app, local.tenantId, { fecha, cerrado: true, motivo: 'Feriado' });
+
+    const config = await cargarConfiguracion(app, local.tenantId);
+    const delDia = config.excepciones.filter((e) => e.fecha === fecha);
+    expect(delDia).toHaveLength(1);
+    expect(delDia[0]).toMatchObject({ cerrado: true, motivo: 'Feriado' });
+  });
+
+  it('agregar un tramo levanta el cierre de esa fecha', async () => {
+    await guardarExcepcion(app, local.tenantId, { fecha, cerrado: true, motivo: 'Feriado' });
+    await guardarExcepcion(app, local.tenantId, {
+      fecha, cerrado: false, desde: '20:00', hasta: '23:00', motivo: 'Al final abrimos',
+    });
+
+    const delDia = (await cargarConfiguracion(app, local.tenantId)).excepciones.filter(
+      (e) => e.fecha === fecha,
+    );
+    expect(delDia).toHaveLength(1);
+    expect(delDia[0]!.cerrado).toBe(false);
+  });
+
+  it('guarda el último ingreso y la franja para las duraciones', async () => {
+    const config = await cargarConfiguracion(app, local.tenantId);
+    const cena = config.franjas.find((f) => f.nombre === 'Cena')!;
+
+    await guardarExcepcion(app, local.tenantId, {
+      fecha, cerrado: false, desde: '18:00', hasta: '23:00',
+      ultimoIngreso: '21:30', franjaId: cena.id,
+    });
+
+    const guardada = (await cargarConfiguracion(app, local.tenantId)).excepciones.find(
+      (e) => e.fecha === fecha,
+    )!;
+    expect(guardada.ultimoIngreso).toBe('21:30');
+    expect(guardada.franjaId).toBe(cena.id);
+  });
+
+  it('rechaza un último ingreso fuera del tramo', async () => {
+    const resultado = await guardarExcepcion(app, local.tenantId, {
+      fecha, cerrado: false, desde: '18:00', hasta: '23:00', ultimoIngreso: '09:00',
+    });
+    expect(resultado).toMatchObject({ tipo: 'invalido' });
+  });
+
+  it('acepta un último ingreso de madrugada si el tramo cruza medianoche', async () => {
+    expect(
+      await guardarExcepcion(app, local.tenantId, {
+        fecha, cerrado: false, desde: '20:00', hasta: '03:00', ultimoIngreso: '01:30',
+      }),
+    ).toEqual({ tipo: 'ok' });
+  });
+
+  it('rechaza un tramo que abre y cierra a la misma hora', async () => {
+    expect(
+      await guardarExcepcion(app, local.tenantId, {
+        fecha, cerrado: false, desde: '20:00', hasta: '20:00',
+      }),
+    ).toMatchObject({ tipo: 'invalido' });
+  });
+});

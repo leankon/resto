@@ -112,11 +112,70 @@ await pagina.click('button[type=submit]');
 await pagina.waitForSelector('.aviso');
 console.log('   ->', (await pagina.textContent('.aviso')).trim());
 
-console.log('9. un día sin feriado sigue aceptando');
-const normal = fechaLocal(4);
-await pagina.fill('input[name=fecha]', normal);
+console.log('9. un día especial que abre ANTES de lo habitual');
+// La cena arranca a las 20:00. Este día se abre a las 18:00, que con la regla vieja
+// —los días especiales solo recortaban— era imposible de decir.
+const especial = fechaLocal(5);
+await pagina.goto('http://localhost:3000/panel/horarios');
+await pagina.waitForSelector('h1');
+const alta = pagina.locator('form').filter({ hasText: 'Motivo' });
+await alta.locator('input[name=fecha]').fill(especial);
+await alta.locator('input[name=cerrado]').uncheck();
+await alta.locator('input[name=desde]').fill('18:00');
+await alta.locator('input[name=hasta]').fill('23:00');
+await alta.locator('input[name=motivo]').fill('Abrimos temprano');
+await alta.getByRole('button', { name: 'Agregar' }).click();
+await pagina.waitForTimeout(1500);
+
+await pagina.goto('http://localhost:3000/panel/nueva');
+await pagina.waitForSelector('input[name=nombre]');
+await pagina.fill('input[name=fecha]', especial);
+await pagina.fill('input[name=hora]', '18:30');
+await pagina.fill('input[name=nombre]', 'Cena Temprana');
+await pagina.fill('input[name=telefono]', '1155551212');
 await pagina.click('button[type=submit]');
-await pagina.waitForTimeout(1800);
+await pagina.waitForSelector('.aviso');
+console.log('   18:30 ->', (await pagina.textContent('.aviso')).trim());
+
+console.log('10. y ese día reemplaza el horario: a las 23:30 ya no hay servicio');
+await pagina.goto('http://localhost:3000/panel/nueva');
+await pagina.waitForSelector('input[name=nombre]');
+await pagina.fill('input[name=fecha]', especial);
+await pagina.fill('input[name=hora]', '23:30');
+await pagina.fill('input[name=nombre]', 'Tarde');
+await pagina.fill('input[name=telefono]', '1155551313');
+await pagina.click('button[type=submit]');
+await pagina.waitForSelector('.aviso');
+console.log('   23:30 ->', (await pagina.textContent('.aviso')).trim());
+
+console.log('11. el mismo día puede tener dos tandas');
+await pagina.goto('http://localhost:3000/panel/horarios');
+await pagina.waitForSelector('h1');
+const alta2 = pagina.locator('form').filter({ hasText: 'Motivo' });
+await alta2.locator('input[name=fecha]').fill(especial);
+await alta2.locator('input[name=cerrado]').uncheck();
+await alta2.locator('input[name=desde]').fill('11:00');
+await alta2.locator('input[name=hasta]').fill('15:00');
+await alta2.locator('input[name=motivo]').fill('Brunch');
+await alta2.getByRole('button', { name: 'Agregar' }).click();
+await pagina.waitForTimeout(1500);
+const filaEspecial = pagina.locator('section').filter({ hasText: 'Días especiales' })
+  .locator('tbody tr').filter({ hasText: especial });
+console.log('   ese día dice:', (await filaEspecial.textContent()).replace(/\s+/g, ' ').trim());
+await pagina.screenshot({ path: `${capturas}/horarios-3.png`, fullPage: true });
+
+console.log('12. un día sin nada especial sigue aceptando');
+// Autocontenido a propósito: los pasos de arriba se fueron a la pantalla de horarios,
+// y dar por sentado en qué página quedó el navegador es cómo se rompen estos recorridos.
+const normal = fechaLocal(4);
+await pagina.goto('http://localhost:3000/panel/nueva');
+await pagina.waitForSelector('input[name=nombre]');
+await pagina.fill('input[name=fecha]', normal);
+await pagina.fill('input[name=hora]', '21:00');
+await pagina.fill('input[name=nombre]', 'Día Normal');
+await pagina.fill('input[name=telefono]', '1155551414');
+await pagina.click('button[type=submit]');
+await pagina.waitForSelector('.aviso');
 console.log('   ->', (await pagina.locator('.aviso').first().textContent()).trim());
 
 console.log('\nerrores de consola:', errores.length === 0 ? 'ninguno' : errores);

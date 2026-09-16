@@ -335,10 +335,15 @@ describe('carrera entre canales', () => {
 
 describe('días cerrados', () => {
   it('un feriado marcado como cerrado rechaza la reserva con su motivo', async () => {
+    // Una fecha admite varios tramos, así que ya no hay una única fila por fecha:
+    // el cierre se arma limpiando el día y dejando la fila de "cerrado".
+    await admin.query(
+      `DELETE FROM excepciones_calendario WHERE tenant_id = $1 AND fecha = '2026-10-12'`,
+      [local.tenantId],
+    );
     await admin.query(
       `INSERT INTO excepciones_calendario (tenant_id, fecha, cerrado, motivo)
-       VALUES ($1, '2026-10-12', true, 'Feriado')
-       ON CONFLICT (tenant_id, fecha) DO UPDATE SET cerrado = true, motivo = 'Feriado'`,
+       VALUES ($1, '2026-10-12', true, 'Feriado')`,
       [local.tenantId],
     );
 

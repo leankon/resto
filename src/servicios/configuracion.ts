@@ -39,6 +39,8 @@ export interface ExcepcionConfigurada {
   cerrado: boolean;
   desde: string | null;
   hasta: string | null;
+  ultimoIngreso: string | null;
+  franjaId: string | null;
   motivo: string | null;
 }
 
@@ -73,10 +75,11 @@ export async function cargarConfiguracion(
       [tenantId],
     );
     const excepciones = await c.query(
-      `SELECT id, to_char(fecha, 'YYYY-MM-DD') AS fecha, cerrado, desde, hasta, motivo
+      `SELECT id, to_char(fecha, 'YYYY-MM-DD') AS fecha, cerrado, desde, hasta,
+              ultimo_ingreso, franja_id, motivo
          FROM excepciones_calendario
         WHERE tenant_id = $1 AND fecha >= current_date - 7
-        ORDER BY fecha`,
+        ORDER BY fecha, cerrado DESC, desde`,
       [tenantId],
     );
 
@@ -108,6 +111,8 @@ export async function cargarConfiguracion(
         cerrado: e.cerrado,
         desde: e.desde ? hhmm(e.desde) : null,
         hasta: e.hasta ? hhmm(e.hasta) : null,
+        ultimoIngreso: e.ultimo_ingreso ? hhmm(e.ultimo_ingreso) : null,
+        franjaId: e.franja_id,
         motivo: e.motivo,
       })),
     };
@@ -314,9 +319,23 @@ export interface DatosExcepcion {
   cerrado: boolean;
   desde?: string | null;
   hasta?: string | null;
+  /** Si no se pone, se acepta gente hasta la hora de cierre. */
+  ultimoIngreso?: string | null;
+  /** Qué reglas de duración usar. `null` manda a las comodín. */
+  franjaId?: string | null;
   motivo?: string | null;
 }
 
+/**
+ * Agrega un día especial: un día cerrado, o un tramo con horario propio.
+ *
+ * Un día especial **reemplaza** el horario habitual de esa fecha, no lo recorta. Por eso
+ * puede abrir antes, abrir menos, o abrir un día en el que el local normalmente cierra.
+ *
+ * Una fecha admite varios tramos —brunch y cena, por ejemplo—, pero "cerrado" es
+ * excluyente: si se marca cerrado, los tramos de esa fecha se van, y si se agrega un
+ * tramo, el cierre se levanta. Dejar las dos cosas juntas no querría decir nada.
+ */
 export async function guardarExcepcion(
   pool: pg.Pool,
   tenantId: string,
@@ -331,22 +350,56 @@ export async function guardarExcepcion(
       motivo: 'Si ese día abre, poné desde qué hora y hasta qué hora.',
     };
   }
+  if (!datos.cerrado && datos.desde === datos.hasta) {
+    return { tipo: 'invalido', motivo: 'La hora de apertura y la de cierre son la misma.' };
+  }
+  if (datos.ultimoIngreso && datos.desde && datos.hasta) {
+    // El último ingreso tiene que caer dentro del tramo. Con un tramo que cruza
+    // medianoche, "adentro" es desde la apertura en adelante o antes del cierre.
+    const dentro = aMinutos(datos.hasta) <= aMinutos(datos.desde)
+      ? aMinutos(datos.ultimoIngreso) >= aMinutos(datos.desde) ||
+        aMinutos(datos.ultimoIngreso) <= aMinutos(datos.hasta)
+      : aMinutos(datos.ultimoIngreso) >= aMinutos(datos.desde) &&
+        aMinutos(datos.ultimoIngreso) <= aMinutos(datos.hasta);
+    if (!dentro) {
+      return {
+        tipo: 'invalido',
+        motivo: 'El último ingreso tiene que estar entre la apertura y el cierre.',
+      };
+    }
+  }
 
-  await conTenant(pool, tenantId, (c) =>
-    c.query(
-      `INSERT INTO excepciones_calendario (tenant_id, fecha, cerrado, desde, hasta, motivo)
-       VALUES ($1, $2::date, $3, $4::time, $5::time, $6)
-       ON CONFLICT (tenant_id, fecha) DO UPDATE
-         SET cerrado = EXCLUDED.cerrado, desde = EXCLUDED.desde,
-             hasta = EXCLUDED.hasta, motivo = EXCLUDED.motivo`,
+  await conTenant(pool, tenantId, async (c) => {
+    if (datos.cerrado) {
+      await c.query(
+        `DELETE FROM excepciones_calendario WHERE tenant_id = $1 AND fecha = $2::date`,
+        [tenantId, datos.fecha],
+      );
+      await c.query(
+        `INSERT INTO excepciones_calendario (tenant_id, fecha, cerrado, motivo)
+         VALUES ($1, $2::date, true, $3)`,
+        [tenantId, datos.fecha, datos.motivo?.trim() || null],
+      );
+      return;
+    }
+
+    await c.query(
+      `DELETE FROM excepciones_calendario
+        WHERE tenant_id = $1 AND fecha = $2::date AND cerrado`,
+      [tenantId, datos.fecha],
+    );
+    await c.query(
+      `INSERT INTO excepciones_calendario
+         (tenant_id, fecha, cerrado, desde, hasta, ultimo_ingreso, franja_id, motivo)
+       VALUES ($1, $2::date, false, $3::time, $4::time, $5::time, $6, $7)`,
       [
-        tenantId, datos.fecha, datos.cerrado,
-        datos.cerrado ? null : (datos.desde ?? null),
-        datos.cerrado ? null : (datos.hasta ?? null),
+        tenantId, datos.fecha, datos.desde, datos.hasta,
+        datos.ultimoIngreso || null,
+        datos.franjaId || null,
         datos.motivo?.trim() || null,
       ],
-    ),
-  );
+    );
+  });
   return { tipo: 'ok' };
 }
 

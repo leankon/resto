@@ -1,6 +1,6 @@
 'use client';
 
-import { Fragment, useActionState } from 'react';
+import { Fragment, useActionState, useState } from 'react';
 import type {
   DuracionConfigurada, ExcepcionConfigurada, FranjaConfigurada,
 } from '../../../servicios/configuracion';
@@ -281,29 +281,63 @@ export function Duraciones({
   );
 }
 
-export function Excepciones({ excepciones }: { excepciones: ExcepcionConfigurada[] }) {
+/**
+ * Días que se salen de la rutina.
+ *
+ * Un día especial REEMPLAZA el horario de esa fecha: por eso puede abrir antes de lo
+ * normal, abrir menos, o abrir un día en el que el local normalmente cierra. Una fecha
+ * admite varios tramos —brunch y cena, por ejemplo—; "cerrado" es excluyente.
+ */
+export function Excepciones({
+  excepciones,
+  franjas,
+}: {
+  excepciones: ExcepcionConfigurada[];
+  franjas: FranjaConfigurada[];
+}) {
   const [error, enviar, enviando] = useActionState(excepcion, null);
+  const [cerrado, setCerrado] = useState(true);
+
+  // Agrupadas por fecha: un día con brunch y cena son dos filas de lo mismo, y verlas
+  // sueltas obliga a reconstruir mentalmente cómo queda ese día.
+  const porFecha = new Map<string, ExcepcionConfigurada[]>();
+  for (const e of excepciones) {
+    const lista = porFecha.get(e.fecha);
+    if (lista) lista.push(e);
+    else porFecha.set(e.fecha, [e]);
+  }
 
   return (
     <>
       {error && <p className="aviso">{error}</p>}
-      {excepciones.length > 0 && (
+      {porFecha.size > 0 && (
         <table>
           <tbody>
-            {excepciones.map((e) => (
-              <tr key={e.id}>
-                <td style={{ width: 120 }}><strong>{e.fecha}</strong></td>
-                <td>
-                  {e.cerrado
-                    ? <span className="pastilla alerta">Cerrado</span>
-                    : <>Abre de {e.desde} a {e.hasta}</>}
-                  {e.motivo && <span className="apagado"> · {e.motivo}</span>}
+            {[...porFecha].map(([fecha, delDia]) => (
+              <tr key={fecha}>
+                <td style={{ width: 120, verticalAlign: 'top' }}>
+                  <strong>{fecha}</strong>
                 </td>
                 <td>
-                  <form action={eliminarExcepcion}>
-                    <input type="hidden" name="excepcionId" value={e.id} />
-                    <button className="secundario chico" type="submit">Quitar</button>
-                  </form>
+                  {delDia.map((e) => (
+                    <div key={e.id} style={{ marginBottom: 4 }}>
+                      {e.cerrado ? (
+                        <span className="pastilla alerta">Cerrado todo el día</span>
+                      ) : (
+                        <>
+                          Abre de <strong>{e.desde}</strong> a <strong>{e.hasta}</strong>
+                          {e.ultimoIngreso && (
+                            <span className="apagado"> · último ingreso {e.ultimoIngreso}</span>
+                          )}
+                        </>
+                      )}
+                      {e.motivo && <span className="apagado"> · {e.motivo}</span>}{' '}
+                      <form action={eliminarExcepcion} style={{ display: 'inline' }}>
+                        <input type="hidden" name="excepcionId" value={e.id} />
+                        <button className="secundario chico" type="submit">Quitar</button>
+                      </form>
+                    </div>
+                  ))}
                 </td>
               </tr>
             ))}
@@ -317,30 +351,55 @@ export function Excepciones({ excepciones }: { excepciones: ExcepcionConfigurada
           <input type="date" name="fecha" required />
         </label>
         <label style={{ flex: '0 0 auto', display: 'flex', gap: 6, alignItems: 'center' }}>
-          <input type="checkbox" name="cerrado" defaultChecked
-                 style={{ width: 'auto', margin: 0 }} />
-          Cerrado
+          <input
+            type="checkbox"
+            name="cerrado"
+            defaultChecked
+            onChange={(e) => setCerrado(e.target.checked)}
+            style={{ width: 'auto', margin: 0 }}
+          />
+          Cerrado todo el día
         </label>
-        <label style={{ flex: '0 1 110px' }}>
-          Si abre, desde
-          <input type="time" name="desde" />
-        </label>
-        <label style={{ flex: '0 1 110px' }}>
-          Hasta
-          <input type="time" name="hasta" />
-        </label>
-        <label style={{ flex: '1 1 160px' }}>
+        {!cerrado && (
+          <>
+            <label style={{ flex: '0 1 105px' }}>
+              Abre
+              <input type="time" name="desde" required />
+            </label>
+            <label style={{ flex: '0 1 105px' }}>
+              Cierra
+              <input type="time" name="hasta" required />
+            </label>
+            <label style={{ flex: '0 1 125px' }}>
+              Último ingreso
+              <input type="time" name="ultimoIngreso" />
+            </label>
+            <label style={{ flex: '0 1 150px' }}>
+              Turnos como
+              <select name="franja" defaultValue="">
+                <option value="">Los de siempre</option>
+                {franjas.map((f) => (
+                  <option key={f.id} value={f.id}>{f.nombre}</option>
+                ))}
+              </select>
+            </label>
+          </>
+        )}
+        <label style={{ flex: '1 1 150px' }}>
           Motivo
-          <input name="motivo" placeholder="Feriado, evento privado…" />
+          <input name="motivo" placeholder="Feriado, evento, Navidad…" />
         </label>
         <div style={{ flex: '0 0 auto' }}>
           <button type="submit" disabled={enviando}>Agregar</button>
         </div>
       </form>
+
       <p className="apagado">
-        Un día marcado como cerrado deja de aceptar reservas, por web y por mostrador.
-        Si esa noche el servicio termina después de medianoche, la madrugada siguiente
-        también queda cerrada.
+        Ese día el horario especial <strong>reemplaza</strong> al de siempre: podés abrir
+        antes, abrir menos, o abrir un día en el que normalmente cerrás. Si el local abre
+        en dos tandas, cargá una fila por cada una. Un día marcado como cerrado deja de
+        aceptar reservas por web y por mostrador, y si esa noche el servicio termina
+        después de medianoche, la madrugada siguiente también queda cerrada.
       </p>
     </>
   );

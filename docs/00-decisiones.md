@@ -270,3 +270,27 @@ el uso real —correrse un rato y ver qué pasa—; el desplegable, para saltar 
 
 **Cargar una reserva a mano no tiene esa restricción.** El que llama por teléfono pide las
 21:10, y obligar al mozo a redondear lo hace perder la mesa o anotar una hora que no es.
+
+## D17 — Un día especial reemplaza el horario, no lo recorta
+
+La versión anterior solo sabía achicar: un día especial se cruzaba con la franja habitual
+y se quedaba con la intersección. El efecto era que **abrir antes de lo normal no se podía
+decir**. Si la cena arranca a las 20:00 y el 21/09 se quiere abrir a las 18:00, no había
+forma de expresarlo; tampoco abrir un día en el que el local normalmente cierra.
+
+Ahora, si una fecha tiene día especial, **ese es el horario de ese día**. Cubre los tres
+casos —abrir antes, abrir menos, abrir un día cerrado— con una sola regla, que además es
+la que el dueño ya tiene en la cabeza: "ese día abrimos de tal a tal".
+
+Una fecha admite **varios tramos**: brunch de 11 a 15 y fiesta de 18 a 02 son dos filas.
+"Cerrado" es excluyente: marcar cerrado borra los tramos de esa fecha, y agregar un tramo
+levanta el cierre. Las dos cosas juntas no querrían decir nada.
+
+Cada tramo puede declarar **qué franja usar para las duraciones**. Sin eso, un día especial
+caería siempre en las reglas comodín y un local con turnos distintos por franja los
+perdería justo el día que más le importa.
+
+**Consecuencia del rediseño:** `resolverTurno` pasó a trabajar con instantes reales en vez
+de minutos desde la medianoche. Es más largo de escribir y es lo correcto: el día en que
+cambia la hora, un tramo de 20:00 a 02:00 no dura seis horas, y la aritmética de minutos no
+tiene manera de enterarse.

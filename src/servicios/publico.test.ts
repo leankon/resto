@@ -112,6 +112,28 @@ describe('disponibilidad', () => {
     ]);
   });
 
+  it('un día especial que abre antes se ofrece desde esa hora', async () => {
+    // La cena del local arranca a las 20:00. Ese día abre a las 18:00, y la web tiene
+    // que ofrecerlo: si no, el local anuncia un horario que su propia página no toma.
+    await admin.query(
+      `INSERT INTO excepciones_calendario (tenant_id, fecha, cerrado, desde, hasta, motivo)
+       VALUES ($1, $2, false, '18:00', '23:00', 'Abrimos temprano')`,
+      [creado.tenantId, dia()],
+    );
+    const resultado = await disponibilidad(app, local, { fecha: dia(), personas: 2 });
+    const horas = resultado.horarios.map((h) => h.hora);
+
+    expect(horas).toContain('18:00');
+    expect(horas[0]).toBe('18:00');
+    // Y reemplaza el horario habitual: el almuerzo de ese día no va más.
+    expect(horas).not.toContain('13:00');
+    expect(resultado.horarios[0]!.franjaNombre).toBe('Abrimos temprano');
+
+    await admin.query('DELETE FROM excepciones_calendario WHERE tenant_id = $1', [
+      creado.tenantId,
+    ]);
+  });
+
   it('no ofrece horarios que ya no llegan a la anticipación mínima', async () => {
     // Se pregunta por hoy, parados a las 20:59, con una hora de anticipación mínima.
     const casiLasNueve = instanteLocal(hoyEn(TZ), '20:59', TZ);

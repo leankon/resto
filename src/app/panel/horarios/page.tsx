@@ -57,7 +57,7 @@ export default async function Horarios() {
 
         <section className="tarjeta">
           <h2>Días especiales</h2>
-          <Excepciones excepciones={config.excepciones} />
+          <Excepciones excepciones={config.excepciones} franjas={config.franjas} />
         </section>
       </main>
     </>
